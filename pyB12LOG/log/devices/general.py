@@ -3,8 +3,8 @@ import os
 import datetime
 import time
 import logging
-
 import pathlib
+from config.config import INST_COMMAND
 
 logpath=pathlib.Path(__file__).parent.parent.parent.joinpath('logs/debug_log.txt')
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ logger.addHandler(ch2)
 commonBaudRate = [9600, 19200, 38400, 57600, 115200]
 
 class DEVICE:
-    def __init__(self, deviceAddress, rm, deviceHistory, LOG_CONFIG, loc):
+    def __init__(self, deviceAddress, rm, deviceHistory, loc):
         self.deviceHistoryStatus = False
         self.loc = loc
         self.deviceAddress = deviceAddress
@@ -48,7 +48,7 @@ class DEVICE:
         self.logDictStatus = False
 
         self.connect(rm)
-        self.categorize(LOG_CONFIG)
+        self.categorize(INST_COMMAND)
         self.log(init = 1) # only check when init
         
     def connect(self, rm): 
@@ -63,10 +63,10 @@ class DEVICE:
                 self.inst.baud_rate = baudRate
                 self.baudRate = baudRate
                 try:
-                    print(baudRate)
                     deviceID = self.inst.query("*IDN?").strip('\n').strip('\r')  
                     break
                 except:
+                    logger.warn('%s baud rate is change to %d' %(self.inst, baudRate))
                     pass
         else:
             self.inst.baud_rate = self.baudRate
@@ -75,9 +75,8 @@ class DEVICE:
             self.deviceStatus = True
             print(self.deviceID, 'Connected!')
         except Exception as err:
-            print(err)
             logger.info(err)
-            print(self.deviceAddress,'is not a valid instrumentation')
+            logger.warn('%s is not a valid instrumentation' %self.deviceAddress,)
 
         if not self.deviceHistoryStatus:
             if self.deviceStatus:
@@ -109,35 +108,15 @@ class DEVICE:
         self.deviceStatus = False
         print(self.modelNumber, 'Disconnected!')
 
-    def categorize(self, LOG_CONFIG):
-        try:
-            if self.deviceID != None:
-                devicesGroups = LOG_CONFIG.getlist('DEVICES', 'family_group',fallback=None)
-                devicesKeywords = LOG_CONFIG.getlist('DEVICES', 'keywords',fallback=None)
-                
-                # find family
-                for index, (keyword, group) in enumerate(zip(devicesKeywords, devicesGroups)): # get the family
-                    if keyword in self.modelNumber:
-                        self.deviceGroup = group
-                        break
-
-                devicesMember = LOG_CONFIG.getlist(self.deviceGroup, 'member',fallback=None)
-                numberOfChannelList = LOG_CONFIG.getlist(self.deviceGroup, 'number_of_channel',fallback=None)
-                startChannel = LOG_CONFIG.get(self.deviceGroup, 'start_channel',fallback=None)
-
-                for index, (name, number_of_channel) in enumerate(zip(devicesMember, numberOfChannelList)): # get number of channel          
-                    if name.strip() in self.modelNumber:
-                        break
-
-                currentChannel = int(startChannel)
-                while currentChannel <= int(number_of_channel):
-                    for key, val in LOG_CONFIG[self.deviceGroup + ':Commands'].items():
-                        self.queryLogDict[key + ' ' + str(currentChannel)] = val.strip() + str(currentChannel)                
-                    currentChannel += 1
-
+    def categorize(self, INST_COMMAND):
+        if self.deviceID:            
+            try:
+                for key, val in INST_COMMAND[self.modelNumber].items():
+                    self.queryLogDict[key.strip()] = val.strip()
                 self.logDictStatus = True
-        except Exception as err:
-            print(self.modelNumber, 'does not have config file.')
+            except Exception as err:
+                logger.warn(err)
+                logger.info('%s does not have config file.' %self.modelNumber)
 
     def log(self , init = 0):
         if self.deviceID != None and self.logDictStatus and self.deviceStatus:
@@ -152,7 +131,7 @@ class DEVICE:
                 except:
                     f = open('./logs/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
                     print(self.deviceID, file = f)
-                    print('Date, Time, ' + ','.join(self.queryLogDict.keys()), file = f)
+                    print('Date, Time, ' + ', '.join(self.queryLogDict.keys()) + ',', file = f)
                     f.close()
 
             else:
@@ -160,10 +139,9 @@ class DEVICE:
                 f = open('./logs/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
                 try:
                     for command in self.queryLogDict.values():
-                        string += (self.inst.query(command).strip('\n') + ', ')
+                        string += (self.inst.query(command).strip('\n').strip('\r') + ', ')
                     print(string, file = f)
-
                 except Exception as err:
-                    print(err)
+                    logger.warn(err)
                 
                 f.close()

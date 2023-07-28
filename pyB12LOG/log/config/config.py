@@ -9,7 +9,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 def _escape_split(s, delim=",", escape="\\"):
     tokens = []
     previous_escape = False
@@ -49,7 +48,7 @@ def _kwarg_converter(s: str):
     return args, kwargs
 
 
-def _get_log_config(configname="log.cfg"):
+def _get_log_config(configname):
     config = configparser.ConfigParser(
         converters={
             "list": lambda x: list(x.strip("[").strip("]").split(",")),
@@ -73,4 +72,4 @@ def _get_log_config(configname="log.cfg"):
     return config
 
 
-LOG_CONFIG = _get_log_config()
+INST_COMMAND = _get_log_config("inst_command.cfg")

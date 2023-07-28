@@ -2,7 +2,6 @@ import pyvisa
 import csv
 from devices import general 
 import time
-from config.config import LOG_CONFIG
 import logging
 import pathlib
 
@@ -21,7 +20,7 @@ logger.addHandler(ch)
 logger.addHandler(ch2)
 
 class pyB12LOG:
-    def __init__(self, timeDelay = 5, loc = './logs/inst_history.csv'):
+    def __init__(self, timeDelay = 5, loc = './logs/inst_reg.csv'):
         self.loc = loc
         self.deviceHistory = {}
         self.initInstHistory()
@@ -43,7 +42,7 @@ class pyB12LOG:
         addressList = []
         if init == 1:
             for address in self.deviceAddresses:
-                device = general.DEVICE(address, self.rm, self.deviceHistory, LOG_CONFIG, self.loc)
+                device = general.DEVICE(address, self.rm, self.deviceHistory, self.loc)
                 self.historicalAddresses.append(address)
                 self.historicalDevices.append(device)
 
@@ -56,19 +55,22 @@ class pyB12LOG:
 
         elif len(self.rm.list_resources()) > len(self.deviceAddresses):
             # a new device added
-
+            logger.warn('New Devices Detected')
             newDeviceAddressList = [addresses for addresses in self.rm.list_resources() if addresses not in self.deviceAddresses]
+            
             # refresh resource manager
             self.rm.close()
             self.rm = pyvisa.ResourceManager()
+            logger.warn('Resource Manager Refreshed')
 
             for address in newDeviceAddressList:
+                logger.warn('%s Found!' %address)
                 if address in self.historicalAddresses:
                     device = self.historicalDevices[self.historicalAddresses.index(address)]
                     device.reconnect(self.rm)
                     
                 else:
-                    device = general.DEVICE(address, self.rm, LOG_CONFIG, self.loc)
+                    device = general.DEVICE(address, self.rm, self.loc)
                     self.historicalAddresses.append(address)
                     self.historicalDevices.append(device)
                     
@@ -82,8 +84,10 @@ class pyB12LOG:
             
         elif len(self.rm.list_resources()) < len(self.deviceAddresses):
             # a device removed
+            logger.warn('Devices Removed')
             removedDeviceAddressList = [addresses for addresses in self.deviceAddresses if addresses not in self.rm.list_resources()]
             for address in removedDeviceAddressList:
+                logger.warn('%s Deleted!' %address)
                 if address in self.validAddresses:
                     address_index = self.validAddresses.index(address)
                     device = self.validDevices[address_index]
@@ -92,17 +96,14 @@ class pyB12LOG:
                     del self.validAddresses[address_index]
                     del self.validDevices[address_index]
                     self.deviceAddresses = self.rm.list_resources()
-                else:
-                    pass
-        else:
-            pass
+
 
     def initInstHistory(self):
         ## get system instrumentation history
         try:
             f = open(self.loc, 'r')
         except:
-            print('Create New Instrumentations History')
+            logger.info('Create New Instrumentations History')
             f = open(self.loc, 'w')
             print('Address,Status,Manufacturer,Model,SN,BaudRate', file = f)
         f = open(self.loc, 'r')
