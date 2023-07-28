@@ -5,8 +5,8 @@ import time
 import logging
 import pathlib
 
-
 logpath=pathlib.Path(__file__).parent.parent.joinpath('logs/debug_log.txt')
+print(str(logpath))
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 ch = logging.FileHandler(str(logpath))
@@ -20,10 +20,10 @@ logger.addHandler(ch)
 logger.addHandler(ch2)
 
 class pyB12LOG:
-    def __init__(self, timeDelay = 5, loc = './logs/inst_reg.csv'):
+    def __init__(self, timeDelay = 5, loc = './logs/device_reg.csv'):
         self.loc = loc
         self.deviceHistory = {}
-        self.initInstHistory()
+        self.initDeviceHistory()
 
         self.validAddresses = []
         self.validDevices = []
@@ -98,12 +98,12 @@ class pyB12LOG:
                     self.deviceAddresses = self.rm.list_resources()
 
 
-    def initInstHistory(self):
-        ## get system instrumentation history
+    def initDeviceHistory(self):
+        ## get device history
         try:
             f = open(self.loc, 'r')
         except:
-            logger.info('Create New Instrumentations History')
+            logger.info('Create New Device History')
             f = open(self.loc, 'w')
             print('Address,Status,Manufacturer,Model,SN,BaudRate', file = f)
         f = open(self.loc, 'r')
@@ -121,12 +121,3 @@ class pyB12LOG:
             for device in self.validDevices:
                 device.log()
             self.lastCheckTime = time.time()
-        
-            
-log = pyB12LOG(timeDelay = 1)
-while(1):
-    try:
-        log.log()
-    except:
-        log = pyB12LOG(timeDelay = 1)
-        log.log()

@@ -4,9 +4,9 @@ import datetime
 import time
 import logging
 import pathlib
-from config.config import INST_COMMAND
+from config.config import COMMAND
 
-logpath=pathlib.Path(__file__).parent.parent.parent.joinpath('logs/debug_log.txt')
+logpath=pathlib.Path(__file__).parent.parent.joinpath('logs/debug_log.txt')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 ch = logging.FileHandler(str(logpath))
@@ -48,39 +48,39 @@ class DEVICE:
         self.logDictStatus = False
 
         self.connect(rm)
-        self.categorize(INST_COMMAND)
+        self.categorize(COMMAND)
         self.log(init = 1) # only check when init
         
     def connect(self, rm): 
         if self.deviceHistoryStatus and not self.deviceStatus:
             return
         else:
-            self.inst = rm.open_resource(self.deviceAddress)
+            self.device = rm.open_resource(self.deviceAddress)
         
         if not self.baudRate:
             print(self.deviceAddress, 'Found! Trying baud rate...')
             for baudRate in commonBaudRate:
-                self.inst.baud_rate = baudRate
+                self.device.baud_rate = baudRate
                 self.baudRate = baudRate
                 try:
-                    deviceID = self.inst.query("*IDN?").strip('\n').strip('\r')  
+                    deviceID = self.device.query("*IDN?").strip('\n').strip('\r')  
                     break
                 except:
-                    logger.warn('%s baud rate is change to %d' %(self.inst, baudRate))
+                    logger.warn('%s baud rate is change to %d' %(self.device, baudRate))
                     pass
         else:
-            self.inst.baud_rate = self.baudRate
+            self.device.baud_rate = self.baudRate
         try:
-            self.deviceID = self.inst.query("*IDN?").strip('\n').strip('\r')
+            self.deviceID = self.device.query("*IDN?").strip('\n').strip('\r')
             self.deviceStatus = True
             print(self.deviceID, 'Connected!')
         except Exception as err:
             logger.info(err)
-            logger.warn('%s is not a valid instrumentation' %self.deviceAddress,)
+            logger.warn('%s is not a valid device' %self.deviceAddress,)
 
         if not self.deviceHistoryStatus:
             if self.deviceStatus:
-                self.deviceID = self.inst.query("*IDN?").strip('\n').strip('\r')
+                self.deviceID = self.device.query("*IDN?").strip('\n').strip('\r')
                 self.deviceManufacturer = self.deviceID.split(',')[0]
                 self.modelNumber = self.deviceID.split(',')[1]
                 self.serialNumber = self.deviceID.split(',')[2]
@@ -95,9 +95,9 @@ class DEVICE:
             f.close()
                 
     def reconnect(self, rm):
-        self.inst = rm.open_resource(self.deviceAddress)
-        self.inst.baud_rate = self.baudRate
-        if self.inst.query("*IDN?"):
+        self.device = rm.open_resource(self.deviceAddress)
+        self.device.baud_rate = self.baudRate
+        if self.device.query("*IDN?"):
             self.deviceStatus = True
             print(self.modelNumber, 'Reconnected!')
         else:
@@ -108,10 +108,10 @@ class DEVICE:
         self.deviceStatus = False
         print(self.modelNumber, 'Disconnected!')
 
-    def categorize(self, INST_COMMAND):
+    def categorize(self, COMMAND):
         if self.deviceID:            
             try:
-                for key, val in INST_COMMAND[self.modelNumber].items():
+                for key, val in COMMAND[self.modelNumber].items():
                     self.queryLogDict[key.strip()] = val.strip()
                 self.logDictStatus = True
             except Exception as err:
@@ -131,7 +131,7 @@ class DEVICE:
                 except:
                     f = open('./logs/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
                     print(self.deviceID, file = f)
-                    print('Date, Time, ' + ', '.join(self.queryLogDict.keys()) + ',', file = f)
+                    print('Date, Time, ' + ', '.join(self.queryLogDict.keys()), file = f)
                     f.close()
 
             else:
@@ -139,7 +139,8 @@ class DEVICE:
                 f = open('./logs/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
                 try:
                     for command in self.queryLogDict.values():
-                        string += (self.inst.query(command).strip('\n').strip('\r') + ', ')
+                        string += (self.device.query(command).strip('\n').strip('\r') + ', ')
+                    string = string[:-2] # remove last commas
                     print(string, file = f)
                 except Exception as err:
                     logger.warn(err)

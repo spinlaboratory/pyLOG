@@ -1,18 +1,37 @@
-2023-07-28 12:37:35,386 - __main__ - INFO - Create New Instrumentations History
-2023-07-28 12:37:37,501 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 9600
-2023-07-28 12:37:39,511 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 19200
-2023-07-28 12:37:41,515 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 38400
-2023-07-28 12:37:43,529 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 57600
-2023-07-28 12:37:45,544 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 115200
-2023-07-28 12:37:47,557 - devices.general - INFO - VI_ERROR_TMO (-1073807339): Timeout expired before operation completed.
-2023-07-28 12:37:47,558 - devices.general - WARNING - ASRL1::INSTR is not a valid instrumentation
-2023-07-28 12:37:49,591 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 9600
-2023-07-28 12:37:51,605 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 19200
-2023-07-28 12:37:53,620 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 38400
-2023-07-28 12:37:55,623 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 57600
-2023-07-28 12:37:57,628 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 115200
-2023-07-28 12:40:15,600 - __main__ - WARNING - Devices Removed
-2023-07-28 12:40:15,784 - __main__ - WARNING - USB0::0x1AB1::0x0E11::DP8E165350191::INSTR Deleted!
-2023-07-28 12:40:30,772 - __main__ - WARNING - New Devices Detected
-2023-07-28 12:40:30,975 - __main__ - WARNING - Resource Manager Refreshed
-2023-07-28 12:40:30,976 - __main__ - WARNING - USB0::0x1AB1::0x0E11::DP8E165350191::INSTR Found!
+2023-07-28 12:53:06,503 - __main__ - INFO - Create New Instrumentations History
+2023-07-28 12:53:08,626 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 9600
+2023-07-28 12:53:10,634 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 19200
+2023-07-28 12:53:12,641 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 38400
+2023-07-28 12:54:20,963 - __main__ - INFO - Create New Device History
+2023-07-28 12:54:23,083 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 9600
+2023-07-28 12:55:43,455 - __main__ - INFO - Create New Device History
+2023-07-28 12:55:45,568 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 9600
+2023-07-28 12:55:47,572 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 19200
+2023-07-28 12:55:49,574 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 38400
+2023-07-28 12:55:51,579 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 57600
+2023-07-28 12:55:53,591 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 115200
+2023-07-28 12:55:55,597 - devices.general - INFO - VI_ERROR_TMO (-1073807339): Timeout expired before operation completed.
+2023-07-28 12:55:55,597 - devices.general - WARNING - ASRL1::INSTR is not a valid device
+2023-07-28 12:56:59,744 - __main__ - INFO - Create New Device History
+2023-07-28 12:57:01,850 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 9600
+2023-07-28 12:57:03,853 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 19200
+2023-07-28 12:57:05,857 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 38400
+2023-07-28 12:57:07,860 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 57600
+2023-07-28 12:57:09,865 - devices.general - WARNING - SerialInstrument at ASRL1::INSTR baud rate is change to 115200
+2023-07-28 12:57:11,874 - devices.general - INFO - VI_ERROR_TMO (-1073807339): Timeout expired before operation completed.
+2023-07-28 12:57:11,874 - devices.general - WARNING - ASRL1::INSTR is not a valid device
+2023-07-28 12:57:17,199 - __main__ - WARNING - New Devices Detected
+2023-07-28 12:57:17,282 - __main__ - WARNING - Resource Manager Refreshed
+2023-07-28 12:57:17,282 - __main__ - WARNING - ASRL4::INSTR Found!
+2023-07-28 12:57:17,282 - __main__ - WARNING - DEVICE.__init__() missing 1 required positional argument: 'loc'
+2023-07-28 12:57:17,283 - __main__ - WARNING - Restart Logging
+2023-07-28 12:57:23,178 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 9600
+2023-07-28 12:57:25,183 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 19200
+2023-07-28 12:57:27,184 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 38400
+2023-07-28 12:57:29,186 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 57600
+2023-07-28 12:57:31,195 - devices.general - WARNING - SerialInstrument at ASRL4::INSTR baud rate is change to 115200
+2023-07-28 12:58:28,501 - __main__ - WARNING - Devices Removed
+2023-07-28 12:58:28,701 - __main__ - WARNING - ASRL4::INSTR Deleted!
+2023-07-28 14:27:37,427 - logger.pyB12LOG - WARNING - New Devices Detected
+2023-07-28 14:27:37,497 - logger.pyB12LOG - WARNING - Resource Manager Refreshed
+2023-07-28 14:27:37,498 - logger.pyB12LOG - WARNING - ASRL4::INSTR Found!

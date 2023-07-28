@@ -72,4 +72,4 @@ def _get_log_config(configname):
     return config
 
 
-INST_COMMAND = _get_log_config("inst_command.cfg")
+COMMAND = _get_log_config("command.cfg")
