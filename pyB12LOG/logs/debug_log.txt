@@ -35,3 +35,7 @@
 2023-07-28 14:27:37,427 - logger.pyB12LOG - WARNING - New Devices Detected
 2023-07-28 14:27:37,497 - logger.pyB12LOG - WARNING - Resource Manager Refreshed
 2023-07-28 14:27:37,498 - logger.pyB12LOG - WARNING - ASRL4::INSTR Found!
+2023-07-31 11:46:09,570 - devices.general - INFO - VI_ERROR_TMO (-1073807339): Timeout expired before operation completed.
+2023-07-31 11:46:09,570 - devices.general - WARNING - ASRL4::INSTR is not a valid device
+2023-07-31 11:47:41,682 - devices.general - INFO - VI_ERROR_TMO (-1073807339): Timeout expired before operation completed.
+2023-07-31 11:47:41,682 - devices.general - WARNING - ASRL4::INSTR is not a valid device

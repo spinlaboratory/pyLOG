@@ -35,16 +35,22 @@ class plotter:
         return hashDict
     
     def plot(self, item, duration):
+        # take care of pnts to plot
         delta = datetime.datetime.strptime(self.hashDict['Time'][-1], '%H:%M:%S') - datetime.datetime.strptime(self.hashDict['Time'][-2], '%H:%M:%S')
         pnts = int(duration//delta.total_seconds())
+        
+        # init common x-axis
         x_label = [self.hashDict['Time'][-pnts:][i] if i in [0,pnts/2, pnts-1] else '' for i in range(pnts)]
         x = [i for i in range(1, pnts + 1)]
-        y = self.hashDict[item][-pnts:] 
-
+        
+        # init figure
         fig = plt.figure(1)
         ax = fig.add_subplot(1,1,1)
-        ax.grid(ls = ':')
         update_require = 1
+
+        # init y-axis
+        
+        y = self.hashDict[item][-pnts:] 
 
         while(plt.fignum_exists(1)):
 
@@ -53,7 +59,7 @@ class plotter:
             if line: # if there is non-empty new line
                 self.hashDict_append(line.strip('\n').split(','), self.hashDict)
                 x_label = [self.hashDict['Time'][-pnts:][i] if i in [0,pnts/2,pnts-1] else '' for i in range(pnts)]
-                y = self.hashDict['voltage1'][-pnts:]
+                y = self.hashDict[item][-pnts:]
                 update_require = 1
 
             else: # if there is no line
