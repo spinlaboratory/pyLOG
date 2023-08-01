@@ -1,27 +1,16 @@
 import pyvisa
-import csv
 from devices import general 
 import time
 import logging
-import pathlib
-
-logpath=pathlib.Path(__file__).parent.parent.joinpath('logs/debug_log.txt')
-print(str(logpath))
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-ch = logging.FileHandler(str(logpath))
-ch.setLevel(logging.INFO)
-ch2 = logging.StreamHandler()
-ch2.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-ch2.setFormatter(formatter)
-logger.addHandler(ch)
-logger.addHandler(ch2)
+import os
+from config.config import CONFIG
 
 class pyB12LOG:
-    def __init__(self, timeDelay = 5, loc = './logs/device_reg.csv'):
-        self.loc = loc
+    def __init__(self):
+        self.timeDelay, self.logDir = self.getConfig() 
+        self.debugLogger = self.initDebugLog(self.logDir)
+
+        self.deviceReg = self.logDir + '/device_reg.csv'
         self.deviceHistory = {}
         self.initDeviceHistory()
 
@@ -34,7 +23,6 @@ class pyB12LOG:
         self.rm = pyvisa.ResourceManager()
         self.deviceAddresses = self.rm.list_resources()
         self.updateValidDevices(init = 1)
-        self.timeDelay = timeDelay # delay time for each logging, unit s
         self.lastCheckTime = time.time()
 
     def updateValidDevices(self, init = 0):
@@ -42,7 +30,7 @@ class pyB12LOG:
         addressList = []
         if init == 1:
             for address in self.deviceAddresses:
-                device = general.DEVICE(address, self.rm, self.deviceHistory, self.loc)
+                device = general.DEVICE(address, self.rm, self.deviceHistory, self.logDir, self.debugLogger)
                 self.historicalAddresses.append(address)
                 self.historicalDevices.append(device)
 
@@ -55,22 +43,22 @@ class pyB12LOG:
 
         elif len(self.rm.list_resources()) > len(self.deviceAddresses):
             # a new device added
-            logger.warn('New Devices Detected')
+            self.debugLogger.warn('New Devices Detected')
             newDeviceAddressList = [addresses for addresses in self.rm.list_resources() if addresses not in self.deviceAddresses]
             
             # refresh resource manager
             self.rm.close()
             self.rm = pyvisa.ResourceManager()
-            logger.warn('Resource Manager Refreshed')
+            self.debugLogger.warn('Resource Manager Refreshed')
 
             for address in newDeviceAddressList:
-                logger.warn('%s Found!' %address)
+                self.debugLogger.warn('%s Found!' %address)
                 if address in self.historicalAddresses:
                     device = self.historicalDevices[self.historicalAddresses.index(address)]
                     device.reconnect(self.rm)
                     
                 else:
-                    device = general.DEVICE(address, self.rm, self.loc)
+                    device = general.DEVICE(address, self.rm, self.deviceHistory, self.logDir, self.debugLogger)
                     self.historicalAddresses.append(address)
                     self.historicalDevices.append(device)
                     
@@ -84,10 +72,10 @@ class pyB12LOG:
             
         elif len(self.rm.list_resources()) < len(self.deviceAddresses):
             # a device removed
-            logger.warn('Devices Removed')
+            self.debugLogger.warn('Devices Removed')
             removedDeviceAddressList = [addresses for addresses in self.deviceAddresses if addresses not in self.rm.list_resources()]
             for address in removedDeviceAddressList:
-                logger.warn('%s Deleted!' %address)
+                self.debugLogger.warn('%s Deleted!' %address)
                 if address in self.validAddresses:
                     address_index = self.validAddresses.index(address)
                     device = self.validDevices[address_index]
@@ -101,12 +89,12 @@ class pyB12LOG:
     def initDeviceHistory(self):
         ## get device history
         try:
-            f = open(self.loc, 'r')
+            f = open(self.deviceReg, 'r')
         except:
-            logger.info('Create New Device History')
-            f = open(self.loc, 'w')
+            self.debugLogger.info('Create New Device History')
+            f = open(self.deviceReg, 'w')
             print('Address,Status,Manufacturer,Model,SN,BaudRate', file = f)
-        f = open(self.loc, 'r')
+        f = open(self.deviceReg, 'r')
         
         line = f.readline().strip('\n')
         while line != '':
@@ -121,3 +109,35 @@ class pyB12LOG:
             for device in self.validDevices:
                 device.log()
             self.lastCheckTime = time.time()
+    
+    def getConfig(self):
+        if 'USER' in CONFIG:
+            configKey = 'USER'
+
+        else:
+            configKey = 'Default'
+
+        logDirHome = CONFIG[configKey]['log_folder_loc'][1:-1]
+        timeDelay = float(CONFIG[configKey]['acquire_interval'])
+
+        listDir = os.listdir(logDirHome)
+        logDir= logDirHome +'/logs/'
+        if 'logs' not in listDir:
+            os.mkdir(logDir)
+        
+        return timeDelay, logDir
+
+    def initDebugLog(self, logDir):
+        logpath = logDir + '/debug_log.txt'
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.DEBUG)
+        ch = logging.FileHandler(str(logpath))
+        ch.setLevel(logging.INFO)
+        ch2 = logging.StreamHandler()
+        ch2.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+        ch2.setFormatter(formatter)
+        logger.addHandler(ch)
+        logger.addHandler(ch2)
+        return logger

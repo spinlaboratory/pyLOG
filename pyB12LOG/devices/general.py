@@ -6,25 +6,14 @@ import logging
 import pathlib
 from config.config import COMMAND
 
-logpath=pathlib.Path(__file__).parent.parent.joinpath('logs/debug_log.txt')
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-ch = logging.FileHandler(str(logpath))
-ch.setLevel(logging.INFO)
-ch2 = logging.StreamHandler()
-ch2.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-ch2.setFormatter(formatter)
-logger.addHandler(ch)
-logger.addHandler(ch2)
-
 commonBaudRate = [9600, 19200, 38400, 57600, 115200]
 
 class DEVICE:
-    def __init__(self, deviceAddress, rm, deviceHistory, loc):
+    def __init__(self, deviceAddress, rm, deviceHistory, logDir, debugLogger):
         self.deviceHistoryStatus = False
-        self.loc = loc
+        self.logDir = logDir
+        self.deviceReg = self.logDir + '/device_reg.csv'
+        self.debugLogger = debugLogger
         self.deviceAddress = deviceAddress
         self.deviceID = None
         self.deviceManufacturer = None
@@ -66,7 +55,7 @@ class DEVICE:
                     deviceID = self.device.query("*IDN?").strip('\n').strip('\r')  
                     break
                 except:
-                    logger.warn('%s baud rate is change to %d' %(self.device, baudRate))
+                    self.debugLogger.warn('%s baud rate is change to %d' %(self.device, baudRate))
                     pass
         else:
             self.device.baud_rate = self.baudRate
@@ -75,8 +64,8 @@ class DEVICE:
             self.deviceStatus = True
             print(self.deviceID, 'Connected!')
         except Exception as err:
-            logger.info(err)
-            logger.warn('%s is not a valid device' %self.deviceAddress,)
+            self.debugLogger.info(err)
+            self.debugLogger.warn('%s is not a valid device' %self.deviceAddress,)
 
         if not self.deviceHistoryStatus:
             if self.deviceStatus:
@@ -85,7 +74,7 @@ class DEVICE:
                 self.modelNumber = self.deviceID.split(',')[1]
                 self.serialNumber = self.deviceID.split(',')[2]
 
-            f = open(self.loc, 'a')
+            f = open(self.deviceReg, 'a')
             print(self.deviceAddress, end = ',', file = f)
             print(self.deviceStatus, end = ',', file = f)
             if self.deviceStatus:
@@ -115,34 +104,34 @@ class DEVICE:
                     self.queryLogDict[key.strip()] = val.strip()
                 self.logDictStatus = True
             except Exception as err:
-                logger.warn(err)
-                logger.info('%s does not have config file.' %self.modelNumber)
+                self.debugLogger.warn(err)
+                self.debugLogger.info('%s does not have config file.' %self.modelNumber)
 
     def log(self , init = 0):
         if self.deviceID != None and self.logDictStatus and self.deviceStatus:
             today = datetime.date.today()
             if init:
                 try:
-                    f = open('./logs/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'r') # try to open a file if exist
+                    f = open(self.logDir + '/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'r') # try to open a file if exist
                     header = f.readline() # try to read header, no header will goes to except routine)
                     if header.strip() != self.deviceID.strip():
                         raise ValueError
                     f.close()
                 except:
-                    f = open('./logs/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
+                    f = open(self.logDir + '/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
                     print(self.deviceID, file = f)
                     print('Date, Time, ' + ', '.join(self.queryLogDict.keys()), file = f)
                     f.close()
 
             else:
                 string = str(today) + ', ' + str(datetime.datetime.now().strftime("%H:%M:%S"))+ ', '
-                f = open('./logs/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
+                f = open(self.logDir + '/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
                 try:
                     for command in self.queryLogDict.values():
                         string += (self.device.query(command).strip('\n').strip('\r') + ', ')
                     string = string[:-2] # remove last commas
                     print(string, file = f)
                 except Exception as err:
-                    logger.warn(err)
+                    self.debugLogger.warn(err)
                 
                 f.close()

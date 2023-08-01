@@ -73,3 +73,4 @@ def _get_log_config(configname):
 
 
 COMMAND = _get_log_config("command.cfg")
+CONFIG = _get_log_config("config.cfg")
