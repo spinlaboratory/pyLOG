@@ -130,29 +130,3 @@ class DEVICE:
 
                 if os.path.getsize(self.fileName) > self.fileSize:
                     self.createFile = True
-
-            # if init:
-            #     try:
-            #         f = open(self.logDir + '/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'r') # try to open a file if exist
-            #         header = f.readline() # try to read header, no header will goes to except routine)
-            #         if header.strip() != self.deviceID.strip():
-            #             raise ValueError
-            #         f.close()
-            #     except:
-            #         f = open(self.logDir + '/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
-            #         print(self.deviceID, file = f)
-            #         print('Date, Time, ' + ', '.join(self.queryLogDict.keys()), file = f)
-            #         f.close()
-
-            # else:
-            #     string = str(today) + ', ' + str(datetime.datetime.now().strftime("%H:%M:%S"))+ ', '
-            #     f = open(self.logDir + '/' + str(today.year) + '_' + str(self.deviceManufacturer) + '_' + str(str(self.modelNumber)) + '.csv', 'a')
-            #     try:
-            #         for command in self.queryLogDict.values():
-            #             string += (self.device.query(command).strip('\n').strip('\r') + ', ')
-            #         string = string[:-2] # remove last commas
-            #         print(string, file = f)
-            #     except Exception as err:
-            #         self.debugLogger.warn(err)
-                
-            #     f.close()
