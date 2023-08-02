@@ -1,4 +1,5 @@
 import os
+from pyvisa.constants import Parity, StopBits
 import datetime
 from config.config import COMMAND
 
@@ -22,23 +23,29 @@ class DEVICE:
         self.idCommand = '*IDN?' # the default command sent to device to check validation 
         self.termination = 'fl' # the default read/write termination, can be change to '\r' or '\n\r'
         self.splitSign = 'default' # the default split sign for query return. It can be different
-        self.dataIndex = 0 # the index of data from return after splits. 
-        # eg. if return is '$TEA, 059, 000, 000', after splitting it, it will become ['$TEA', '059', '000', '000'], and '059' is the wanted value  
+        self.dataIndex = 0 # the index of data from return after splits.
+        self.dataBits = 8
+        self.flowControl = 0
+        self.parity = 0
+        self.stopBits = 10
 
         if deviceAddress in deviceRegDict: # check if device address is saved in device registration dictionary. The device address is the key.
             deviceInfo = deviceRegDict[deviceAddress][:-1] # skip the 'Address' in the value
             self.deviceRegDictStatus = True # because the device found, this value is set to True
             self.deviceStatus = deviceInfo[1] == 'True' # device status (valid or not)
-            if self.deviceStatus: # if True, overwrite device information from device registration
-                self.deviceManufacturer = deviceInfo[2]
-                self.modelNumber = deviceInfo[3]
-                self.serialNumber = deviceInfo[4]
-                self.baudRate = int(deviceInfo[5])
-                self.idCommand = deviceInfo[6].strip()
-                self.termination = deviceInfo[7].strip()
-                self.splitSign = deviceInfo[8].strip()
-                self.dataIndex = int(deviceInfo[9])
-            
+            self.deviceManufacturer = deviceInfo[2]
+            self.modelNumber = deviceInfo[3]
+            self.serialNumber = deviceInfo[4]
+            self.baudRate = int(deviceInfo[5])
+            self.idCommand = deviceInfo[6].strip()
+            self.termination = deviceInfo[7].strip()
+            self.splitSign = deviceInfo[8].strip()
+            self.dataIndex = int(deviceInfo[9])
+            self.dataBits = int(deviceInfo[10])
+            self.flowControl = int(deviceInfo[11])
+            self.parity = int(deviceInfo[12])
+            self.stopBits = int(deviceInfo[13])
+        
         self.queryLogDict = {} # The log dictionary
         self.logDictStatus = False
         
@@ -56,15 +63,15 @@ class DEVICE:
             return
         else:
             self.device = rm.open_resource(self.deviceAddress) # open rm for valid device or unknown device
-            self.setTermination() # set write read termination from device registration
+            self.setSerial()
 
         if not self.baudRate: # this check the baud rate for unknown device. If the device is valid, the baud rate is saved in device registration
             print(self.deviceAddress, 'Found! Trying baud rate...')
             for baudRate in commonBaudRate:
-                self.device.baud_rate = baudRate
                 self.baudRate = baudRate
+                self.device.baud_rate = self.baudRate
                 try:
-                    self.device.query(self.idCommand).strip('\n').strip('\r')  
+                    print(self.device.query(self.idCommand).strip('\n').strip('\r'))
                     break
                 except:
                     self.debugLogger.warn('%s baud rate is change to %d' %(self.device, baudRate))
@@ -75,21 +82,27 @@ class DEVICE:
         try:
             self.deviceID = self.device.query(self.idCommand).strip('\n').strip('\r') # try to check communication again
             self.deviceStatus = True # device connected and device is valid
-            print(self.modelNumber, 'Connected!')
+            print(self.deviceAddress, self.modelNumber, 'Connected!')
+            print(self.idCommand, ': ', self.deviceID)
 
         except Exception as err:
             self.debugLogger.info(err)
             self.debugLogger.warn('%s is not a valid device' %self.deviceAddress,)
 
         if not self.deviceRegDictStatus: # if device info is not in device registration, then save the new device info to registration
-            if self.deviceStatus:
-                self.deviceID = self.device.query(self.idCommand).strip('\n').strip('\r')
-                self.deviceManufacturer = self.deviceID.split(self.splitter)[0]
-                self.modelNumber = self.deviceID.split(self.splitter)[1]
-                self.serialNumber = self.deviceID.split(self.splitter)[2]
-
+            if self.deviceStatus and not self.deviceID:
+                try:
+                    self.deviceID = self.device.query(self.idCommand).strip('\n').strip('\r')
+                    self.deviceManufacturer = self.deviceID.split(self.splitter)[0]
+                    self.modelNumber = self.deviceID.split(self.splitter)[1]
+                    self.serialNumber = self.deviceID.split(self.splitter)[2]
+                except:
+                    self.deviceManufacturer, self.modelNumber, self.serialNumber = None, None, None
+                    self.debugLogger.warn('%s does not have a valid ID. Please update in device_reg.txt' %self.deviceAddress)
             f = open(self.deviceRegFile, 'a')
-            for item in [self.deviceAddress, self.deviceStatus, self.deviceManufacturer, self.modelNumber, self.serialNumber, self.baudRate, self.idCommand, self.termination, self.splitSign, self.dataIndex]:
+            for item in [self.deviceAddress, self.deviceStatus, self.deviceManufacturer, self.modelNumber, self.serialNumber, 
+                         self.baudRate, self.idCommand, self.termination, self.splitSign, self.dataIndex,
+                         self.dataBits, self.flowControl, self.parity, self.stopBits]:
                 print(item, end = ',', file = f)
             print(file = f)
             f.close()
@@ -97,7 +110,7 @@ class DEVICE:
     def reconnect(self, rm):
         self.device = rm.open_resource(self.deviceAddress)
         self.device.baud_rate = self.baudRate
-        self.setTermination() # set write read termination from device registration
+        self.setSerial()
 
         if self.device.query(self.idCommand):
             self.deviceStatus = True
@@ -110,6 +123,7 @@ class DEVICE:
         self.deviceStatus = False
         print(self.modelNumber, 'Disconnected!')
 
+
     def categorize(self, COMMAND):
         if self.deviceID:            
             try:
@@ -120,12 +134,65 @@ class DEVICE:
                 self.debugLogger.warn(err)
                 self.debugLogger.info('%s does not have config file.' %self.modelNumber)
     
+    def setSerial(self):
+        self.setTermination()
+        self.setParity()
+        self.setStopBits()
+
+        # other configurations
+        self.device.flow_control = self.flowControl
+        self.device.data_bits = self.dataBits
+            
     def setTermination(self):
         self.endSign = self.termination.replace('fl', '\n')
         self.endSign = self.endSign.replace('cr', '\r')
         self.device.write_termination = self.endSign
         self.device.read_termination = self.endSign
         
+    def setParity(self):
+        '''
+        even = 2
+        mark = 3
+        none = 0
+        odd = 1
+        space = 4
+        '''
+
+        if self.parity == 2:
+            self.device.parity = Parity.even
+
+        elif self.parity == 3:
+            self.devive.parity = Parity.mark
+        
+        elif self.parity == 1:
+            self.device.parity = Parity.odd
+
+        elif self.parity == 4:
+            self.device.parity = Parity.space
+
+        elif self.parity == 0:
+            self.device.parity = Parity.none
+
+        else:
+            self.debugLogger.info('Parity Incorrect')
+            raise TypeError('Parity Incorrect')
+    
+    def setStopBits(self):
+        '''
+        one = 10
+        one_and_a_half = 15
+        two = 20
+        '''
+
+        if self.stopBits == 10:
+            self.device.stop_bits = StopBits.one
+        elif self.stopBits == 15:
+            self.device.stop_bits = StopBits.one_and_a_half
+        elif self.stopBits == 20:
+            self.device.stop_bits = StopBits.two
+        else:
+            self.debugLogger.info('Stop bits Incorrect')
+            raise TypeError('Stop bits Incorrect')
 
     def log(self , init = 0):
         if self.deviceID != None and self.logDictStatus and self.deviceStatus:

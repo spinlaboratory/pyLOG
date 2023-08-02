@@ -1,4 +1,5 @@
 import pyvisa
+from pyvisa.constants import StopBits, Parity
 from devices import general 
 import time
 import logging
@@ -94,7 +95,7 @@ class pyB12LOG:
         except: # not exists, create new file
             self.debugLogger.info('Create New Device History') 
             f = open(self.deviceRegFile, 'w')
-            print('Address,Status,Manufacturer,Model,SN,BaudRate,idCommand,terminal,splitSign,dataIndex', file = f) # maybe this should be put into config file?
+            print('Address,Status,Manufacturer,Model,SN,BaudRate,idCommand,terminal,splitSign,dataIndex,dataBits,flowControl,parity,stopBits', file = f) # maybe this should be put into config file?
         f = open(self.deviceRegFile, 'r')
         
         line = f.readline() # avoid putting header into dictionary
