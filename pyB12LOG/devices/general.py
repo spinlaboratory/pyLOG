@@ -13,25 +13,9 @@ class DEVICE:
         self.debugLogger = debugLogger
 
         # some default settings. They can be overwritten by 'deviceRegFile' if information exists.
-        # for key in SEIRAL_CONFIG:
-        #     for item, val in SEIRAL_CONFIG[key].items():
-        #         exec("self." + "%s = %s" %(item, val))
-
-        self.device_address = device_address # also for searching in deviceRegFile
-        self.device_id = None
-        self.device_manufacturer = None
-        self.model_number = None
-        self.serial_number = None
-        self.device_status = False
-        self.baud_rate = 9600
-        self.id_command = '*IDN?' # the default command sent to device to check validation 
-        self.termination = 'fl' # the default read/write termination, can be change to '\r' or '\n\r'
-        self.split_sign = 'default' # the default split sign for query return. It can be different
-        self.data_index = 0 # the index of data from return after splits.
-        self.data_bits = 8
-        self.flow_control = 0
-        self.parity = 0
-        self.stop_bits = 10
+        for key in SEIRAL_CONFIG:
+            for item, val in SEIRAL_CONFIG[key].items():
+                exec("self." + "%s = %s" %(item, val))
 
         if device_address in deviceRegDict: # check if device address is saved in device registration dictionary. The device address is the key.
             deviceInfo = deviceRegDict[device_address][:-1] # skip the 'Address' in the value
