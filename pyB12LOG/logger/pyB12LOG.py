@@ -29,8 +29,6 @@ class pyB12LOG:
         if init == 1:
             for address in self.deviceAddresses:
                 device = general.DEVICE(address, self.rm, self.deviceRegDict, self.logDir, self.debugLogger, self.fileSize)
-                self.historicalAddresses.append(address)
-                self.historicalDevices.append(device)
 
                 if device.device_id != None:
                     deviceList.append(device)
