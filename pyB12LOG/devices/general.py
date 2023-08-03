@@ -59,6 +59,7 @@ class DEVICE:
         self.log(init = 1) # only check when init
         
     def connect(self, rm): 
+    
         if self.deviceRegDictStatus and not self.deviceStatus: # the device info is in device registration , and device is set to invalid (disable)
             return
         else:
@@ -82,15 +83,15 @@ class DEVICE:
         try:
             self.deviceID = self.device.query(self.idCommand).strip('\n').strip('\r') # try to check communication again
             self.deviceStatus = True # device connected and device is valid
-            print(self.deviceAddress, self.modelNumber, 'Connected!')
+            print(self.deviceAddress, 'Connected!')
             print(self.idCommand, ': ', self.deviceID)
 
         except Exception as err:
             self.debugLogger.info(err)
             self.debugLogger.warn('%s is not a valid device' %self.deviceAddress,)
-
+        
         if not self.deviceRegDictStatus: # if device info is not in device registration, then save the new device info to registration
-            if self.deviceStatus and not self.deviceID:
+            if self.deviceStatus and self.deviceID:
                 try:
                     self.deviceID = self.device.query(self.idCommand).strip('\n').strip('\r')
                     self.deviceManufacturer = self.deviceID.split(self.splitter)[0]
