@@ -9,7 +9,7 @@ from configparser import ConfigParser
 class pyB12LOG:
     def __init__(self):
         self.timeDelay, self.logDir, self.fileSize = self.getLogSettings() 
-        self.debugLogger = self.initDebugLog(self.logDir)
+        self.debugLogger = self.initDebugLog()
 
         self.rm = pyvisa.ResourceManager()
         self.deviceAddresses = self.rm.list_resources()
@@ -96,8 +96,8 @@ class pyB12LOG:
         
         return timeDelay, logDir, fileSize
 
-    def initDebugLog(self, logDir):
-        logpath = logDir + '/debug_log.txt'
+    def initDebugLog(self):
+        logpath = self.logDir + '/debug_log.txt'
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.DEBUG)
         ch = logging.FileHandler(str(logpath))
@@ -109,4 +109,5 @@ class pyB12LOG:
         ch2.setFormatter(formatter)
         logger.addHandler(ch)
         logger.addHandler(ch2)
+
         return logger

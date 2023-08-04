@@ -58,6 +58,7 @@ class DEVICE:
                     self.active_addresses.append(address)         
                 
                 except Exception as err:
+                    self.debugLogger.warn(err)
                     self.debugLogger.info('%s is inactive' %address)
                     self.deviceConfig[address]['device_status'] = 'False'
                     
@@ -99,7 +100,8 @@ class DEVICE:
                 for item, command in self.commandConfig[model].items():
                     try: 
                         data.append(inst.query(command).strip('\n').strip('\r').split(split_sign)[data_index])
-                    except:
+                    except Exception as err:
+                        self.debugLogger.info(err)
                         data.append(0)
                         self.new_file = 1
         if self.query_items and self.active_addresses:
