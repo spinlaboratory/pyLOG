@@ -44,6 +44,7 @@ class DEVICE:
                     inst.write_termination = termination
   
                     device_id = inst.query(id_command).strip('\r').strip('\n').strip()
+                    self.debugLogger.info('%s connected!' %device_id)
 
                     if not device_manufacturer or not model_number or not serial_number:
                         add_device_manufacturer = device_id.split(split_sign)[0]
