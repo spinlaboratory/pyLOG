@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import csv
 import datetime
-from matplotlib.widgets import Button, RadioButtons, CheckButtons
+from matplotlib.widgets import Button, RadioButtons, CheckButtons, Slider 
 
 class plotter:
     def __init__(self, logDir):
@@ -15,6 +15,7 @@ class plotter:
         self.f = None
         self.current_log = None
         self.log_index = 1 # debug log is always index 0
+        self.pnts = 1e5
 
         self.logRead()
 
@@ -47,18 +48,21 @@ class plotter:
             hashDict[key].append(val)
         return hashDict
     
-    def plot(self, items, duration):
-        # take care of pnts to plot
-        delta = datetime.datetime.strptime(self.hashDict['Time'][-1], '%H:%M:%S') - datetime.datetime.strptime(self.hashDict['Time'][-5], '%H:%M:%S')
-        pnts = int(duration//delta.total_seconds() * 5)
-        
-        # init common x-axis
-        x = [i for i in range(1, pnts + 1)]
-        x_ticks = [x[0], x[pnts//2], x[-1]]
-        x_label = [self.hashDict['Time'][-pnts:][0], self.hashDict['Time'][-pnts:][pnts//2] , self.hashDict['Time'][-pnts:][-1]]
-        
-        # init y-axis
-        ys = [self.hashDict[item][-pnts:] for item in items]
+    def plot(self, items):
+        # taking care of 
+        self.time_length = len(self.hashDict['Time'])
+        if self.time_length < self.pnts: 
+            x = [i for i in range(1, self.time_length + 1)]
+            x_ticks = [x[0], x[self.time_length//2], x[-1]]
+            x_label = [self.hashDict['Time'][0], self.hashDict['Time'][self.time_length//2] , self.hashDict['Time'][-1]]
+            ys = [self.hashDict[item] for item in items]
+
+        else:
+            x = [i for i in range(1, self.pnts + 1)]
+            x_ticks = [x[0], x[self.pnts//2], x[-1]]
+            x_label = [self.hashDict['Time'][-self.pnts:][0], self.hashDict['Time'][-self.pnts:][self.pnts//2] , self.hashDict['Time'][-self.pnts:][-1]]
+            ys = [self.hashDict[item][-self.pnts:] for item in items]
+
         color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC']
 
         # init figure
@@ -104,8 +108,18 @@ class plotter:
             line = self.f.readline().strip('\n')
             if line: # if there is non-empty new line
                 self.hashDict_append(line.strip('\n').split(','), self.hashDict)
-                x_label = [self.hashDict['Time'][-pnts:][0], self.hashDict['Time'][-pnts:][pnts//2] , self.hashDict['Time'][-pnts:][-1]]
-                ys = [self.hashDict[item][-pnts:] for item in items]
+                self.time_length = len(self.hashDict['Time'])
+                if self.time_length < self.pnts: 
+                    x = [i for i in range(1, self.time_length + 1)]
+                    x_ticks = [x[0], x[self.time_length//2], x[-1]]
+                    x_label = [self.hashDict['Time'][0], self.hashDict['Time'][self.time_length//2] , self.hashDict['Time'][-1]]
+                    ys = [self.hashDict[item] for item in items]
+
+                else:
+                    x = [i for i in range(1, pnts + 1)]
+                    x_ticks = [x[0], x[pnts//2], x[-1]]
+                    x_label = [self.hashDict['Time'][-pnts:][0], self.hashDict['Time'][-pnts:][pnts//2] , self.hashDict['Time'][-pnts:][-1]]
+                    ys = [self.hashDict[item][-pnts:] for item in items]
                 update_require = 1
 
             else: # if there is no line
