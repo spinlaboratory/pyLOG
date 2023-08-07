@@ -5,7 +5,7 @@ import datetime
 
 class plotter:
     def __init__(self, log):
-        self.log = log
+        self.logDir = log
         self.header = None
         self.items = None
         self.hashDict = None
@@ -15,7 +15,6 @@ class plotter:
     
     def logRead(self):
         self.f = open(self.log, 'r')
-        self.header = self.f.readline().strip('\n').split(',')
         self.items = self.f.readline().strip('\n').split(',')
         self.hashDict ={x.strip(): [] for x in self.items}
         
@@ -34,10 +33,10 @@ class plotter:
             hashDict[key].append(val)
         return hashDict
     
-    def plot(self, item, duration):
+    def plot(self, items, duration):
         # take care of pnts to plot
-        delta = datetime.datetime.strptime(self.hashDict['Time'][-1], '%H:%M:%S') - datetime.datetime.strptime(self.hashDict['Time'][-2], '%H:%M:%S')
-        pnts = int(duration//delta.total_seconds())
+        delta = datetime.datetime.strptime(self.hashDict['Time'][-1], '%H:%M:%S') - datetime.datetime.strptime(self.hashDict['Time'][-5], '%H:%M:%S')
+        pnts = int(duration//delta.total_seconds() * 5)
         
         # init common x-axis
         x_label = [self.hashDict['Time'][-pnts:][i] if i in [0,pnts/2, pnts-1] else '' for i in range(pnts)]
@@ -49,8 +48,8 @@ class plotter:
         update_require = 1
 
         # init y-axis
-        
-        y = self.hashDict[item][-pnts:] 
+        ys = [self.hashDict[item][-pnts:] for item in items]
+        color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC']
 
         while(plt.fignum_exists(1)):
 
@@ -59,16 +58,20 @@ class plotter:
             if line: # if there is non-empty new line
                 self.hashDict_append(line.strip('\n').split(','), self.hashDict)
                 x_label = [self.hashDict['Time'][-pnts:][i] if i in [0,pnts/2,pnts-1] else '' for i in range(pnts)]
-                y = self.hashDict[item][-pnts:]
+                ys = [self.hashDict[item][-pnts:] for item in items]
                 update_require = 1
 
             else: # if there is no line
                 if update_require:
                     # f.seek(where) # (option) find current pointer
                     ax.clear()
+                    # ax.locator_params(nbins = 5)
                     ax.set_xticks(x, x_label)
-                    ax.grid(ls = ':')
-                    ax.plot(x, y, '#F37021')
+                    # ax.grid(ls = ':')
+                    for index, (y, color) in enumerate(zip(ys, color_lists)):
+                        ax.plot(x, y, color, label = items[index])
+
+                    ax.legend()
                     update_require = 0
         
 
