@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import csv
 import datetime
+from matplotlib.widgets import Button, RadioButtons, CheckButtons
 
 class plotter:
     def __init__(self, logDir):
@@ -56,14 +57,45 @@ class plotter:
         x_ticks = [x[0], x[pnts//2], x[-1]]
         x_label = [self.hashDict['Time'][-pnts:][0], self.hashDict['Time'][-pnts:][pnts//2] , self.hashDict['Time'][-pnts:][-1]]
         
-        # init figure
-        fig = plt.figure(1)
-        ax = fig.add_subplot(1,1,1)
-        update_require = 1
-
         # init y-axis
         ys = [self.hashDict[item][-pnts:] for item in items]
         color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC']
+
+        # init figure
+        fig = plt.figure(1, figsize = (16,12))
+        plt.subplots_adjust(left=0.25)
+        ax = fig.add_subplot(1,1,1)
+        update_require = 0
+
+        # initial plotting
+        lines_list = []
+        for index, (y, color) in enumerate(zip(ys, color_lists)):
+            l0, = ax.plot(x, y, color, label = items[index])
+            lines_list.append(l0) # this is for checkbutton
+        ax.set_xticks(x_ticks)
+        ax.set_xticklabels(x_label)
+        ax.grid(ls = ':')
+        ax.set_xlabel('Time')
+
+        # checkbutton settings
+        lines_by_label = {l.get_label(): l for l in lines_list}               
+        line_colors = [l.get_color() for l in lines_by_label.values()]
+        self.visibility_by_label = {l.get_label(): l.get_visible() for l in lines_list}
+
+        rax = fig.add_axes([0.01, 0.4, 0.15, 0.15])
+        check = CheckButtons(
+            ax=rax,
+            labels=lines_by_label.keys(),
+            actives=[l.get_visible() for l in lines_by_label.values()],
+            label_props={'color': line_colors},
+            frame_props={'edgecolor': line_colors},
+            check_props={'facecolor': line_colors},
+        )
+        
+        def callback(label):
+            self.visibility_by_label[label] = not self.visibility_by_label[label]
+
+        check.on_clicked(callback)
 
         while(plt.fignum_exists(1)):
 
@@ -77,19 +109,20 @@ class plotter:
                 update_require = 1
 
             else: # if there is no line
-                if update_require:
+                if update_require:               
                     # f.seek(where) # (option) find current pointer
                     ax.clear()
-                    ax.set_xticks(x_ticks)
-                    ax.set_xticklabels(x_label)
                     ax.grid(ls = ':')
                     for index, (y, color) in enumerate(zip(ys, color_lists)):
-                        ax.plot(x, y, color, label = items[index])
+                        label = items[index]
+                        l, = ax.plot(x, y, color, label = label)
+                        l.set_visible(self.visibility_by_label[label])
 
-                    ax.legend()
+                    ax.set_xticks(x_ticks)
+                    ax.set_xticklabels(x_label)
                     ax.set_xlabel('Time')
+
                     update_require = 0
-        
 
             plt.pause(0.01) # showing new plot
     
