@@ -17,7 +17,6 @@ class plotter:
 
         self.logRead()
 
-    
     def logRead(self):
         self.log_list = os.listdir(self.logDir)
         while self.current_log != self.log_list[-1]: 
@@ -53,8 +52,9 @@ class plotter:
         pnts = int(duration//delta.total_seconds() * 5)
         
         # init common x-axis
-        x_label = [self.hashDict['Time'][-pnts:][i] if i in [0,pnts/2, pnts-1] else '' for i in range(pnts)]
         x = [i for i in range(1, pnts + 1)]
+        x_ticks = [x[0], x[pnts//2], x[-1]]
+        x_label = [self.hashDict['Time'][-pnts:][0], self.hashDict['Time'][-pnts:][pnts//2] , self.hashDict['Time'][-pnts:][-1]]
         
         # init figure
         fig = plt.figure(1)
@@ -72,7 +72,7 @@ class plotter:
             line = self.f.readline().strip('\n')
             if line: # if there is non-empty new line
                 self.hashDict_append(line.strip('\n').split(','), self.hashDict)
-                x_label = [self.hashDict['Time'][-pnts:][i] if i in [0,pnts/2,pnts-1] else '' for i in range(pnts)]
+                x_label = [self.hashDict['Time'][-pnts:][0], self.hashDict['Time'][-pnts:][pnts//2] , self.hashDict['Time'][-pnts:][-1]]
                 ys = [self.hashDict[item][-pnts:] for item in items]
                 update_require = 1
 
@@ -80,13 +80,14 @@ class plotter:
                 if update_require:
                     # f.seek(where) # (option) find current pointer
                     ax.clear()
-                    # ax.locator_params(nbins = 5)
-                    ax.set_xticks(x, x_label)
-                    # ax.grid(ls = ':')
+                    ax.set_xticks(x_ticks)
+                    ax.set_xticklabels(x_label)
+                    ax.grid(ls = ':')
                     for index, (y, color) in enumerate(zip(ys, color_lists)):
                         ax.plot(x, y, color, label = items[index])
 
                     ax.legend()
+                    ax.set_xlabel('Time')
                     update_require = 0
         
 
