@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt
 import csv
 import datetime
 from matplotlib.widgets import Button, RadioButtons, CheckButtons, Slider 
+from config.config import CONFIG
 
 class plotter:
-    def __init__(self, logDir):
-        self.logDir = logDir
+    def __init__(self, max_pnts = 1e4):
+        deviceConfigDirHome = CONFIG['CONFIG']['log_folder_location'][1:-1]
+        self.logDir = deviceConfigDirHome + '/B12TLOG/'
         self.header = None
         self.items = None
         self.hashDict = {}
@@ -15,9 +17,10 @@ class plotter:
         self.f = None
         self.current_log = None
         self.log_index = 1 # debug log is always index 0
-        self.max_pnts = int(1e4)
+        self.max_pnts = int(max_pnts)
 
         self.logRead()
+        self.plot()
 
     def logRead(self):
         self.log_list = os.listdir(self.logDir)
@@ -29,12 +32,13 @@ class plotter:
                 
                 self.items = self.f.readline().strip('\n').split(',')
                 for x in self.items:
-                    if x.strip() not in self.hashDict:
-                        self.hashDict[x.strip()] = []
+                    if x.strip() not in self.hashDict: # if new item is found
+                        self.hashDict[x.strip()] = [0] * len(self.hashDict['Date']) if self.hashDict else [] # take care if new item appears with old log, then put all 0 to the front
 
                 for data in csv.reader(self.f, delimiter = ','): # O(1)
                     self.hashDict = self.hashDict_append(data, self.hashDict) # O(n)
             self.log_index += 1
+        self.items = list(self.hashDict.keys())[2:] # get all headers/items
 
     def hashDict_append(self, info, hashDict):
         for index, key in enumerate(hashDict.keys()):
@@ -48,8 +52,8 @@ class plotter:
             hashDict[key].append(val)
         return hashDict
     
-    def plot(self, items):
-        # taking care of 
+    def plot(self):
+        items = self.items
         self.time_length = len(self.hashDict['Time'])
         if self.time_length < self.max_pnts: 
             self.pnts = self.time_length//2
