@@ -24,13 +24,12 @@ class DEVICE:
         self.active_addresses = []
         self.query_items = []
         self.new_file = 1
-        self.update_connect()
-        self.log()
 
     def update_connect(self):
         self.deviceConfig.read(self.deviceConfigDirFile)
+        self.error_flag = False # This is the flag to restart the resource manager
         for address in rm.list_resources():
-            if self.deviceConfig[address]['device_status'] == 'True' and address not in self.active_addresses:
+            if self.deviceConfig[address]['device_status'] == 'True' and address not in self.active_addresses: # if the device status is True and device is not connected yet
                 serial_settings_dict = {}
                 for item, val in self.deviceConfig[address].items():
                     exec("serial_settings_dict['%s'] = %s" %(item, val)) # assign value from config. Be careful about changing it
@@ -44,7 +43,8 @@ class DEVICE:
                     inst.read_termination = serial_settings_dict['termination']
                     inst.write_termination = serial_settings_dict['termination']
   
-                    device_id = inst.query(serial_settings_dict['id_command']).strip('\r').strip('\n').strip()
+                    inst.query(serial_settings_dict['id_command']).strip('\r').strip('\n').strip() # first check
+                    device_id = inst.query(serial_settings_dict['id_command']).strip('\r').strip('\n').strip() # actually query ID from device
                     self.debugLogger.info('%s connected!' %device_id)
 
                     if not serial_settings_dict['device_manufacturer'] or not serial_settings_dict['model_number'] or not serial_settings_dict['serial_number']:
@@ -60,6 +60,7 @@ class DEVICE:
                     self.active_addresses.append(address)         
                 
                 except Exception as err:
+                    self.error_flag = True
                     self.debugLogger.warn(err)
                     self.debugLogger.info('%s is inactive' %address)
                     self.deviceConfig[address]['device_status'] = 'False'
@@ -72,10 +73,12 @@ class DEVICE:
                 with open(self.deviceConfigDirFile, 'w') as conf:
                     self.deviceConfig.write(conf)
 
+        if self.error_flag: # this will force whole program restart in logger.py
+            raise ConnectionError('Connection Restarts')
+
     def log(self):
         self.update_connect()
         self.commandConfig.read(self.commandConfigFile)
- 
         if self.new_file:
             for address in self.active_addresses:
                 model_number = self.deviceConfig[address]['model_number'].replace("'", '')
@@ -104,7 +107,7 @@ class DEVICE:
                         data.append(inst.query(command).strip('\n').strip('\r').split(split_sign)[data_index])
                     except Exception as err:
                         self.debugLogger.info(err)
-                        data.append(0)
+                        data.append('0')
                         self.new_file = 1
         if self.query_items and self.active_addresses:
             with open(self.logFile, 'a') as f:
