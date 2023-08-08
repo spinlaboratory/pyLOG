@@ -1,3 +1,11 @@
+"""
+pyB12LOG: The logging program for instrumentations
+
+Author: Yen-Chun Huang
+
+Company: Bridge 12 Technologies, Inc
+"""
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
