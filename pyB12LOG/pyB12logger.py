@@ -10,9 +10,9 @@ def main_func():
     parser = argparse.ArgumentParser(prog='pyB12logger')
     parser.add_argument('status', type=str, nargs='?', default = 'start', choices = ['start', 'stop'],
                         help='To start/stop pyB12logger. If no argument, the pyB12logger will start by default')
-    parser.add_argument('-desktop', type=bool, default = False,
+    parser.add_argument('-desktop', type=str, default = False,
                         help='To create desktop icons')
-    parser.add_argument('-startup', type=bool,
+    parser.add_argument('-startup', type=str, default = None,
                         help='To enable/disable pyB12logger at startup.')
     args = parser.parse_args()
     if args.status == 'start':
@@ -25,28 +25,29 @@ def main_func():
         source_running_logger = os.path.dirname(sys.executable) + '/scripts/pyB12logger_running.exe' 
         source_plotter = os.path.dirname(sys.executable) + '/scripts/pyB12plotter.exe' 
 
-        if args.startup:
-            if not os.path.exists(startup_folder + 'pyB12logger_running.exe'):
+        if args.startup == 'True':
+            if not os.path.exists(startup_folder + '/pyB12logger_running.exe'):
                 shutil.copy(source_running_logger, startup_folder)
-                print('Startup Enables.')
+                print('pyB12logger will run on startup.')
+        elif args.startup == 'False':
+            if not os.path.exists(startup_folder + '/pyB12logger_running.exe'):
+                print(startup_folder + 'pyB12logger_running.exe')
+                print('pyB12logger does not run on startup.')
             else:
-                print('Startup has been enabled.')
-        elif args.startup == False:
-            if not os.path.exists(startup_folder + 'pyB12logger_running.exe'):
-                print('Startup has not been enabled.')
-            else:
-                os.remove(startup_folder + 'pyB12logger_running.exe')
-                print('Startup disables.')
+                os.remove(startup_folder + '/pyB12logger_running.exe')
+                print('pyB12logger will not run on startup.')
 
-        if args.desktop:
-            if not os.path.exists(desktop_folder + 'pyB12logger_running.exe'):
+        if args.desktop == 'True':
+            if not os.path.exists(desktop_folder + '/pyB12logger_running.exe'):
                 shutil.copy(source_running_logger, desktop_folder)
                 print('Create pyB12logger_running.exe on the desktop.')
             else:
                 print('pyB12logger_running.exe is on desktop already.')
             
-            if not os.path.exists(desktop_folder + 'pyB12plotter.exe'):
+            if not os.path.exists(desktop_folder + '/pyB12plotter.exe'):
                 shutil.copy(source_plotter, desktop_folder)
+                print('Create pyB12plotter_running.exe on the desktop.')
+            else:    
                 print('pyB12plotter.exe is on desktop already.')
 
 
