@@ -28,6 +28,7 @@ class plotter:
         self.max_pnts = int(max_pnts)
         self.update_figure = True
         self.static_figure = False
+        self.update_visibility = False
         self.selected_file = False
         self.current_selected_file = None
 
@@ -114,7 +115,13 @@ class plotter:
         
         def callback(label):
             self.visibility_by_label[label] = not self.visibility_by_label[label]
+            self.update_visibility = True
             self.update_figure = True
+
+            if self.static_figure == True:
+                self.ln = self.lines_by_label[label]
+                self.ln.set_visible(not self.ln.get_visible())
+                fig.canvas.draw_idle()
 
         check.on_clicked(callback)
 
@@ -183,7 +190,6 @@ class plotter:
                 self.update_figure = True        
 
             if self.update_figure and not self.static_figure: 
-                ax.clear() # clean figure
                 if not self.selected_file:
                 # real-time figure
                 ## updates plotting information       
@@ -210,7 +216,7 @@ class plotter:
                         self.selected_file_dict = self.hashDict_append(data, self.selected_file_dict) # O(n)
                         self.file_length += 1                   
                     x = [i for i in range(1, self.file_length + 1)]
-                    x_ticks = [x[0], x[self.file_length//2], x[-1]]
+                    x_ticks = [1, x[self.file_length//2], x[-1]]
                     x_label = [self.selected_file_dict['Date'][-self.file_length:][0] +'\n'+ self.selected_file_dict['Time'][-self.file_length:][0], 
                             self.selected_file_dict['Date'][-self.file_length:][self.file_length//2] +'\n'+ self.selected_file_dict['Time'][-self.file_length:][self.file_length//2], 
                             self.selected_file_dict['Date'][-self.file_length:][-1] +'\n'+ self.selected_file_dict['Time'][-self.file_length:][-1]]
@@ -219,11 +225,17 @@ class plotter:
                     self.static_figure = True # update figure only once
                  
                 # self.f.seek(where) # (option) find current pointer
+                ax.clear() # clean figure
+                self.lines_by_label = {}
                 for index, (y, color) in enumerate(zip(ys, color_lists)):
                     label = items[index]
                     if self.visibility_by_label[label]:
-                        ax.plot(x, y, color, label = label)
-
+                        l, = ax.plot(x, y, color, label = label)
+                    else:
+                        l, = ax.plot([], [], label = label)
+                    l.set_visible(self.visibility_by_label[label])
+                    self.lines_by_label[l.get_label()] = l
+                
                 ax.set_xticks(x_ticks)
                 ax.set_xticklabels(x_label)
                 ax.set_xlabel('Time')
@@ -233,7 +245,10 @@ class plotter:
                 else:
                     ax.set_title('pyB12plotter')
 
+                # self.colors = [l.get_colors() for l in self.lines_by_label] # for check button in static figure
+
                 self.update_figure = False
+                self.update_visibility = False
 
             plt.pause(0.01) # showing new plot
     
