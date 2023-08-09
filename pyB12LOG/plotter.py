@@ -115,11 +115,9 @@ class plotter:
 
         check.on_clicked(callback)
 
-        # slider bar
+        # slider bar and reset for zooming
         self.slider_pnts = int(self.max_pnts / 2)
-
         slider_ax = fig.add_axes([0.25, 0.15, 0.65, 0.03], facecolor = '#F37021')
-        
         sTime = Slider(
             ax=slider_ax,
             label='Zoom',
@@ -127,23 +125,20 @@ class plotter:
             valmax = self.max_pnts,
             valinit = int(self.max_pnts / 2),
         )
-        
         sTime.valtext.set_visible(False)
-
         def update(val):
             self.slider_pnts = int(sTime.val)
             self.update_figure = True
-        
         sTime.on_changed(update)
 
         # reset
-        resetax = plt.axes([0.8, 0.08, 0.1, 0.04])
-        button = Button(resetax, 'Reset', color='lightgoldenrodyellow', hovercolor='0.975')
+        zoom_resetax = plt.axes([0.92, 0.15, 0.05, 0.04])
+        zoom_button = Button(zoom_resetax, 'Reset', color='lightgoldenrodyellow', hovercolor='0.975')
 
-        def reset(event):
+        def zoom_reset(event):
             sTime.reset()
             self.update_figure = True
-        button.on_clicked(reset)
+        zoom_button.on_clicked(zoom_reset)
 
         while(plt.fignum_exists(1)):
 
