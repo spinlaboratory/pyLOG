@@ -35,8 +35,8 @@ setuptools.setup(
         ],
         console_scripts = [
             "pyB12logger = pyB12LOG.pyB12logger:main_func",
-            "pyB12logger_debug = pyB12LOG.run_logger:main_func",
             "pyB12plotter_debug = pyB12LOG.run_plotter:main_func",            
+            "pyB12logger_debug = pyB12LOG.run_logger:main_func",
         ],
     ),
     package_data={"pyB12LOG": ["config/command.cfg", "config/config.cfg", "config/serial.cfg"]},
