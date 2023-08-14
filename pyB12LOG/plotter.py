@@ -9,15 +9,13 @@ Company: Bridge 12 Technologies, Inc
 """
 
 import os
-import numpy as np
 import matplotlib.pyplot as plt
 import csv
-import datetime
 from matplotlib.widgets import Button, RadioButtons, CheckButtons, Slider 
 from .config.config import CONFIG
 
 class plotter:
-    def __init__(self, max_pnts = 1e4):
+    def __init__(self, max_pnts = 1e4, number_of_file = 100):
         deviceConfigDirHome = CONFIG['CONFIG']['log_folder_location'][1:-1]
         self.logDir = deviceConfigDirHome + '/B12TLOG/'
         self.header = None
@@ -33,12 +31,13 @@ class plotter:
         self.update_visibility = False
         self.selected_file = False
         self.current_selected_file = None
+        self.number_of_file = number_of_file
 
         self.logRead()
         self.plot()
 
     def logRead(self):
-        self.log_list = [log for log in os.listdir(self.logDir) if 'log_' in log]
+        self.log_list = [log for log in os.listdir(self.logDir) if 'log_' in log][-1*self.number_of_file:]
         while self.current_log != self.log_list[-1]: 
             self.current_log = self.log_list[self.log_index] # update current log
             self.current_log = self.current_log
@@ -153,13 +152,12 @@ class plotter:
         zoom_button.on_clicked(zoom_reset)
 
         # slider bar and reset for selecting files
-        self.selection_files = 1000
         file_slider_ax = fig.add_axes([0.25, 0.10, 0.65, 0.03], facecolor = '#F37021')
         sFile = Slider(
             ax=file_slider_ax,
             label='Files',
             valmin = 0,
-            valmax = self.selection_files,
+            valmax = self.number_of_file,
             valinit = 0,
         )
         sFile.valtext.set_visible(False)
@@ -209,7 +207,7 @@ class plotter:
                 else:
                     if self.selected_file_reverse_index > len(self.log_list): # avoid out of range
                         self.selected_file_reverse_index = len(self.log_list)
-                    self.current_selected_file = self.log_list[-1 * self.selected_file_reverse_index]
+                    self.current_selected_file = self.log_list[-1 * self.selected_file_reverse_index] # self.log_list is constantly being updated
                     self.selected_file_dict = {key: [] for key in self.hashDict.keys()}
                     file = open(self.logDir + self.current_selected_file, 'r')
                     file.readline() # skip 1st line 
