@@ -203,11 +203,12 @@ class plotter:
                     self.static_figure = True # update figure only once
 
                 elif self.selected_date:
-                    x, x_ticks, x_label, ys = self._get_plot_values(self.dict_by_date, len(self.dict_by_date['Date']), self.items, ticks = 10)
+                    x, x_ticks, x_label, ys = self._get_plot_values(self.dict_by_date, len(self.dict_by_date['Date' ]), self.items, ticks = 10)
                     self.static_figure = True # update figure only once
 
                 # self.f.seek(where) # (option) find current pointer
                 ax.clear() # clean figure
+                del self.lines_by_label # release memory
                 self.lines_by_label = {}
                 for index, (y, color) in enumerate(zip(ys, color_lists)):
                     label = self.items[index]
