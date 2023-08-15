@@ -15,7 +15,7 @@ from matplotlib.widgets import Button, RadioButtons, CheckButtons, Slider, TextB
 from .config.config import CONFIG
 
 class plotter:
-    def __init__(self, max_pnts = 1e4, number_of_file = 100):
+    def __init__(self, number_of_file = 10):
         deviceConfigDirHome = CONFIG['CONFIG']['log_folder_location'][1:-1]
         self.logDir = deviceConfigDirHome + '/B12TLOG/'
         self.header = None
@@ -25,7 +25,6 @@ class plotter:
         self.f = None
         self.current_log = None
         self.log_index = 1 # debug log is always index 0
-        self.max_pnts = int(max_pnts)
         self.update_figure = True
         self.static_figure = False
         self.update_visibility = False
@@ -35,6 +34,7 @@ class plotter:
         self.number_of_file = number_of_file
 
         self.logRead()
+        self.max_pnts = len(self.hashDict['Date'])
         self.plot()
 
     def logRead(self):

@@ -10,7 +10,7 @@ from .plotter import *
 
 def main_func():
     parser = argparse.ArgumentParser(prog='pyB12plotter')
-    parser.add_argument('number_of_file', type=int, nargs='?', default = 100, 
+    parser.add_argument('number_of_file', type=int, nargs='?', default = 10, 
                         help='To select number of files to plot in real-time')
     args = parser.parse_args()
     current_exe = os.popen('wmic process get description').read().strip().replace(' ', '').split('\n\n')
