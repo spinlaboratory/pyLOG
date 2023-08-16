@@ -47,7 +47,7 @@ def main_func():
         else:    
                 print('pyB12plotter.exe is on desktop already.')
     
-    if not args.startup and not args.desktop: # not arguments 
+    if not args.startup and not args.desktop and not args.status: # not arguments 
         args.status = 'start'
 
     if args.status == 'start':
