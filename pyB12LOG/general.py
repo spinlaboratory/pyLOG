@@ -81,7 +81,7 @@ class DEVICE:
                         self.activeDevices.remove(inst)
                         self.activeAddresses.remove(address) 
 
-                with open(self.deviceConfigDirFile, 'w') as conf:
+                with open(self.deviceConfigDirFile, 'w') as conf: ## Change configuration file
                     self.deviceConfig.write(conf)
 
         if self.errorFlag: # this will force whole program restart in logger.py
