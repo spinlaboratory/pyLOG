@@ -47,7 +47,7 @@ class plotter:
             self.items = self.f.readline().strip('\n').split(',')
             self.hashDict = self._hashDict_values_length_keeper(self.items, self.hashDict, 'Date')
             for data in csv.reader(self.f, delimiter = ','): # O(1)
-                self.hashDict = self._hashDict_append(data, self.hashDict) 
+                self.hashDict = self._hashDict_append(self.items, data, self.hashDict) 
             self.log_index += 1
         self.items = list(self.hashDict.keys())[2:] # get all headers/items
     
@@ -173,7 +173,7 @@ class plotter:
             # where = self.f.tell() # (option) f current position of pointer
             line = self.f.readline().strip('\n')
             if line: # if there is non-empty new line
-                self.hashDict = self._hashDict_append(line.strip('\n').split(','), self.hashDict)
+                self.hashDict = self._hashDict_append(self.items, line.strip('\n').split(','), self.hashDict)
                 self.time_length = len(self.hashDict['Time'])
                 self.update_figure = True        
 
@@ -196,7 +196,7 @@ class plotter:
                     file.readline() # skip 1st line 
                     self.file_length = 0
                     for data in csv.reader(file, delimiter = ','): # O(1)
-                        self.selected_file_dict = self._hashDict_append(data, self.selected_file_dict) # O(n)
+                        self.selected_file_dict = self._hashDict_append(self.items, data, self.selected_file_dict) # O(n)
                         self.file_length += 1                   
                     
                     x, x_ticks, x_label, ys = self._get_plot_values(self.selected_file_dict, self.file_length, self.items, ticks = 10)
@@ -257,24 +257,26 @@ class plotter:
                 d[key] = [0] * len(d[checker]) if d else [] # take care if new item appears with old log, then put all 0 to the front
         return d
 
-    def _hashDict_append(self, data, d):
+    def _hashDict_append(self, items, data, d):
         '''
         This function is to read file from csv and add data to dictionary
         Args:
-            data: a new data
-            d: current dictionary
+            items: the items in the current file
+            data: a new data from current file
+            d: existing dictionary
 
         Return:
             d: the appended dictionary
 
         '''
+        td = {key: val for key, val in zip(items, data)}
         for index, key in enumerate(d.keys()):
-            if key == 'Date':
-                val = data[index]
-            elif key == 'Time':
-                val = data[index].strip() # not necessary to convert string to time in plotting
+            if key == 'Data' or key == 'Time':
+                val = td[key].strip()
+            elif key in td:
+                val = float(td[key])
             else:
-                val = float(data[index])
+                val = 0
             
             if len(d[key]) > 2000:
                 del d[key][0] 
@@ -351,7 +353,7 @@ class plotter:
             keys = file.readline().strip('\n').split(',')
             self.hashDict = self._hashDict_values_length_keeper(keys, dict_by_date, 'Date')
             for data in csv.reader(file, delimiter = ','): # O(1)
-                dict_by_date = self._hashDict_append(data, dict_by_date) # O(n)
+                dict_by_date = self._hashDict_append(keys, data, dict_by_date) # O(n)
         return dict_by_date
 
         
