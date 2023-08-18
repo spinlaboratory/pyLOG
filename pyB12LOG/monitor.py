@@ -9,6 +9,7 @@ Company: Bridge 12 Technologies, Inc
 """
 
 import os
+import numpy as _np
 import matplotlib.pyplot as plt
 import csv
 from matplotlib.widgets import Button, RadioButtons, CheckButtons, Slider, TextBox
@@ -19,7 +20,6 @@ class monitor:
         deviceConfigDirHome = CONFIG['CONFIG']['log_folder_location'][1:-1]
         self.logDir = deviceConfigDirHome + '/B12TLOG/'
         self.header = None
-        self.items = None
         self.hashDict = {}
         self.log_list = os.listdir(self.logDir)
         self.f = None
@@ -44,10 +44,10 @@ class monitor:
             self.current_log = self.log_list[self.log_index] # update current log
             self.current_log = self.current_log
             self.f = open(self.logDir + self.current_log, 'r')
-            self.items = self.f.readline().strip('\n').split(',')
-            self.hashDict = self._hashDict_values_length_keeper(self.items, self.hashDict, 'Date')
+            self.keys = self.f.readline().strip('\n').split(',')
+            self.hashDict = self._hashDict_values_length_keeper(self.keys, self.hashDict, 'Date')
             for data in csv.reader(self.f, delimiter = ','): # O(1)
-                self.hashDict = self._hashDict_append(self.items, data, self.hashDict) 
+                self.hashDict = self._hashDict_append(self.keys, data, self.hashDict) 
             self.log_index += 1
         self.items = list(self.hashDict.keys())[2:] # get all headers/items
     
@@ -173,7 +173,7 @@ class monitor:
             # where = self.f.tell() # (option) f current position of pointer
             line = self.f.readline().strip('\n')
             if line: # if there is non-empty new line
-                self.hashDict = self._hashDict_append(self.items, line.strip('\n').split(','), self.hashDict)
+                self.hashDict = self._hashDict_append(self.keys, line.strip('\n').split(','), self.hashDict)
                 self.time_length = len(self.hashDict['Time'])
                 self.update_figure = True        
 
@@ -196,7 +196,7 @@ class monitor:
                     file.readline() # skip 1st line 
                     self.file_length = 0
                     for data in csv.reader(file, delimiter = ','): # O(1)
-                        self.selected_file_dict = self._hashDict_append(self.items, data, self.selected_file_dict) # O(n)
+                        self.selected_file_dict = self._hashDict_append(self.keys, data, self.selected_file_dict) # O(n)
                         self.file_length += 1                   
                     
                     x, x_ticks, x_label, ys = self._get_plot_values(self.selected_file_dict, self.file_length, self.items, ticks = 10)
@@ -257,7 +257,7 @@ class monitor:
                 d[key] = [0] * len(d[checker]) if d else [] # take care if new item appears with old log, then put all 0 to the front
         return d
 
-    def _hashDict_append(self, items, data, d):
+    def _hashDict_append(self, keys, data, d, memory_reduce = True):
         '''
         This function is to read file from csv and add data to dictionary
         Args:
@@ -269,16 +269,16 @@ class monitor:
             d: the appended dictionary
 
         '''
-        td = {key.strip(): val.strip() for key, val in zip(items, data)}
+        td = {key.strip(): val.strip() for key, val in zip(keys, data)}
         for key in d.keys():
             if key == 'Date' or key == 'Time':
                 val = td[key].strip()
-            elif key in td:
+            elif key in td and td[key].strip() != 'nan':
                 val = float(td[key])
             else:
-                val = 0
+                val = _np.nan
             
-            if len(d[key]) > 2000:
+            if len(d[key]) > 2000 and memory_reduce:
                 del d[key][0] 
             d[key].append(val)
         return d
@@ -353,7 +353,7 @@ class monitor:
             keys = file.readline().strip('\n').split(',')
             self.hashDict = self._hashDict_values_length_keeper(keys, dict_by_date, 'Date')
             for data in csv.reader(file, delimiter = ','): # O(1)
-                dict_by_date = self._hashDict_append(keys, data, dict_by_date) # O(n)
+                dict_by_date = self._hashDict_append(keys, data, dict_by_date, memory_reduce = False) # O(n)
         return dict_by_date
 
         
