@@ -83,6 +83,12 @@ class DEVICE:
 
                 with open(self.deviceConfigDirFile, 'w') as conf: ## Change configuration file
                     self.deviceConfig.write(conf)
+            
+            # When the device is off
+            if self.deviceConfig[address]['device_status'] == 'False' and address in self.activeAddresses: # if the device status is False and in active device
+                self.newFile = 1
+                self.activeDevices.remove(inst)
+                self.activeAddresses.remove(address) 
 
         if self.errorFlag: # this will force whole program restart in logger.py
             raise ConnectionError('Connection Restarts')
@@ -108,7 +114,6 @@ class DEVICE:
 
         today = datetime.date.today()
         data = {'Date': str(today), 'Time': str(datetime.datetime.now().strftime("%H:%M:%S"))}
-        data = [str(today), str(datetime.datetime.now().strftime("%H:%M:%S"))]
         for inst, address in zip(self.activeDevices, self.activeAddresses):
             model = self.deviceConfig[address]['model_number'].replace("'", '')
             split_sign = self.deviceConfig[address]['split_sign'].replace("'", '')

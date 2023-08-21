@@ -32,8 +32,8 @@ class monitor:
         self.hashDict = {}
         self.log_list = os.listdir(self.logDir)
         self.f = None
+        self.log_index = 0
         self.current_log = None
-        self.log_index = 1 # debug log is always index 0
         self.update_figure = True
         self.static_figure = False
         self.update_visibility = False
@@ -52,14 +52,17 @@ class monitor:
         del self.log_list # release memory
         self.log_list = [log for log in os.listdir(self.logDir) if 'log_' in log][-1*self.number_of_file:]
         while self.current_log != self.log_list[-1]: 
-            self.current_log = self.log_list[self.log_index] # update current log
-            self.current_log = self.current_log
+            if self.log_index < self.number_of_file:
+                self.current_log = self.log_list[self.log_index] # update current log
+            else:
+                self.current_log = self.log_list[-1]
             self.f = open(self.logDir + self.current_log, 'r')
             self.keys = self.f.readline().strip('\n').split(',')
             self.hashDict = self._hashDict_values_length_keeper(self.keys, self.hashDict, 'Date')
             for data in csv.reader(self.f, delimiter = ','): # O(1)
                 self.hashDict = self._hashDict_append(self.keys, data, self.hashDict) 
             self.log_index += 1
+
         self.items = list(self.hashDict.keys())[2:] # get all headers/items
     
     def plot(self):
@@ -71,7 +74,7 @@ class monitor:
         
         x, x_ticks, x_label, ys = self._get_plot_values(self.hashDict, self.pnts, self.items)
 
-        color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC'] * (len(self.items) // 4) 
+        color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC'] * (len(self.items) // 4 + 1) 
 
         # init figure
         fig = plt.figure(1, figsize = (16,12))
