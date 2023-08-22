@@ -1,7 +1,7 @@
 """
 pyB12LOG: The logging program for instrumentations
 
-plotter.py: plotting data in real-time or static
+monitor.py: plotting data in real-time or static
 
 Author: Yen-Chun Huang
 
@@ -9,22 +9,31 @@ Company: Bridge 12 Technologies, Inc
 """
 
 import os
+import numpy as _np
 import matplotlib.pyplot as plt
 import csv
+from collections import Counter
 from matplotlib.widgets import Button, RadioButtons, CheckButtons, Slider, TextBox
 from .config.config import CONFIG
+from configparser import ConfigParser
 
-class plotter:
+class monitor:
     def __init__(self, number_of_file = 10):
         deviceConfigDirHome = CONFIG['CONFIG']['log_folder_location'][1:-1]
         self.logDir = deviceConfigDirHome + '/B12TLOG/'
+
+        self.deviceConfigDirFile = deviceConfigDirHome +'/B12TLOG_Config/device_config.cfg'
+        self.deviceConfig = ConfigParser()
+
+        self.commandConfigFile = deviceConfigDirHome +'/B12TLOG_Config/command.cfg'
+        self.commandConfig = ConfigParser()
+
         self.header = None
-        self.items = None
         self.hashDict = {}
         self.log_list = os.listdir(self.logDir)
         self.f = None
+        self.log_index = 0
         self.current_log = None
-        self.log_index = 1 # debug log is always index 0
         self.update_figure = True
         self.static_figure = False
         self.update_visibility = False
@@ -33,6 +42,8 @@ class plotter:
         self.current_selected_file = None
         self.number_of_file = number_of_file
 
+        self.last_device_dict = {}
+        self._update_status()
         self.logRead()
         self.max_pnts = len(self.hashDict['Date'])
         self.plot()
@@ -41,14 +52,17 @@ class plotter:
         del self.log_list # release memory
         self.log_list = [log for log in os.listdir(self.logDir) if 'log_' in log][-1*self.number_of_file:]
         while self.current_log != self.log_list[-1]: 
-            self.current_log = self.log_list[self.log_index] # update current log
-            self.current_log = self.current_log
+            if self.log_index < self.number_of_file:
+                self.current_log = self.log_list[self.log_index] # update current log
+            else:
+                self.current_log = self.log_list[-1]
             self.f = open(self.logDir + self.current_log, 'r')
-            self.items = self.f.readline().strip('\n').split(',')
-            self.hashDict = self._hashDict_values_length_keeper(self.items, self.hashDict, 'Date')
+            self.keys = self.f.readline().strip('\n').split(',')
+            self.hashDict = self._hashDict_values_length_keeper(self.keys, self.hashDict, 'Date')
             for data in csv.reader(self.f, delimiter = ','): # O(1)
-                self.hashDict = self._hashDict_append(data, self.hashDict) 
+                self.hashDict = self._hashDict_append(self.keys, data, self.hashDict) 
             self.log_index += 1
+
         self.items = list(self.hashDict.keys())[2:] # get all headers/items
     
     def plot(self):
@@ -60,7 +74,7 @@ class plotter:
         
         x, x_ticks, x_label, ys = self._get_plot_values(self.hashDict, self.pnts, self.items)
 
-        color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC'] * (len(self.items) // 4) 
+        color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC'] * (len(self.items) // 4 + 1) 
 
         # init figure
         fig = plt.figure(1, figsize = (16,12))
@@ -82,7 +96,7 @@ class plotter:
         ax.grid(ls = ':')
         ax.set_xlabel('Time')
 
-        # check buttons
+        # check buttons for showing curves
         rax = fig.add_axes([0.01, 0.4, 0.2, 0.15])
         check = CheckButtons(
             ax=rax,
@@ -104,6 +118,39 @@ class plotter:
                 fig.canvas.draw_idle()
 
         check.on_clicked(callback)
+
+        # check buttons for showing status of devices
+        rax_device = fig.add_axes([0.01, 0.8, 0.2, 0.15])
+        check_device = CheckButtons(
+            ax = rax_device,
+            labels= list(self.current_device_dict.keys()),
+            actives = list(self.current_device_dict.values()),
+            # label_props={'color': line_colors},
+            # frame_props={'edgecolor': line_colors},
+            # check_props={'facecolor': line_colors},
+        )
+
+        def callback_device(label):
+            self.current_device_dict[label] = not self.current_device_dict[label]
+            if label != 'Logger':
+                address = self.address_dict[label]
+                self.deviceConfig[address]['device_status'] = str(self.current_device_dict[label])
+            elif label == 'Logger':
+                current_exe = os.popen('wmic process get description').read().strip().replace(' ', '').split('\n\n')
+                hashDict = Counter(current_exe)
+                if 'pyB12logger_running.exe' not in hashDict and 'pyB12logger_debug.exe' not in hashDict and self.current_device_dict[label] == True:
+                    os.startfile('pyB12logger_running.exe')
+                    print('pyB12logger starts')
+                elif 'pyB12logger_running.exe' in hashDict or 'pyB12logger_debug.exe' in hashDict and self.current_device_dict[label] == False:
+                    os.system("taskkill /im pyB12logger_running.exe /F")
+                    os.system("taskkill /im pyB12logger_debug.exe /F")
+                    print('pyB12logger stops')
+            
+            with open(self.deviceConfigDirFile, 'w') as conf: ## Change configuration file
+                self.deviceConfig.write(conf)
+
+        check_device.on_clicked(callback_device)
+
 
         # slider bar and reset for zooming
         self.slider_pnts = int(self.max_pnts / 2)
@@ -168,12 +215,12 @@ class plotter:
         reset_button.on_clicked(reset)
 
         while(plt.fignum_exists(1)):
-
+            self._update_status()
             self.logRead() # check if new log creates
             # where = self.f.tell() # (option) f current position of pointer
             line = self.f.readline().strip('\n')
             if line: # if there is non-empty new line
-                self.hashDict = self._hashDict_append(line.strip('\n').split(','), self.hashDict)
+                self.hashDict = self._hashDict_append(self.keys, line.strip('\n').split(','), self.hashDict)
                 self.time_length = len(self.hashDict['Time'])
                 self.update_figure = True        
 
@@ -196,7 +243,7 @@ class plotter:
                     file.readline() # skip 1st line 
                     self.file_length = 0
                     for data in csv.reader(file, delimiter = ','): # O(1)
-                        self.selected_file_dict = self._hashDict_append(data, self.selected_file_dict) # O(n)
+                        self.selected_file_dict = self._hashDict_append(self.keys, data, self.selected_file_dict) # O(n)
                         self.file_length += 1                   
                     
                     x, x_ticks, x_label, ys = self._get_plot_values(self.selected_file_dict, self.file_length, self.items, ticks = 10)
@@ -225,9 +272,9 @@ class plotter:
                 if self.selected_file:
                     ax.set_title(self.current_selected_file)
                 elif self.selected_date:
-                    ax.set_title('pyB12plotter\n%s - %s' %(self.dict_by_date['Date'][0] + ' ' + self.dict_by_date['Time'][0], self.dict_by_date['Date'][-1] + ' ' + self.dict_by_date['Time'][-1]))
+                    ax.set_title('pyB12monitor\n%s - %s' %(self.dict_by_date['Date'][0] + ' ' + self.dict_by_date['Time'][0], self.dict_by_date['Date'][-1] + ' ' + self.dict_by_date['Time'][-1]))
                 else:
-                    ax.set_title('pyB12plotter')
+                    ax.set_title('pyB12monitor')
 
                 self.update_figure = False
                 self.update_visibility = False
@@ -257,26 +304,28 @@ class plotter:
                 d[key] = [0] * len(d[checker]) if d else [] # take care if new item appears with old log, then put all 0 to the front
         return d
 
-    def _hashDict_append(self, data, d):
+    def _hashDict_append(self, keys, data, d, memory_reduce = True):
         '''
         This function is to read file from csv and add data to dictionary
         Args:
-            data: a new data
-            d: current dictionary
+            items: the items in the current file
+            data: a new data from current file
+            d: existing dictionary
 
         Return:
             d: the appended dictionary
 
         '''
-        for index, key in enumerate(d.keys()):
-            if key == 'Date':
-                val = data[index]
-            elif key == 'Time':
-                val = data[index].strip() # not necessary to convert string to time in plotting
+        td = {key.strip(): val.strip() for key, val in zip(keys, data)}
+        for key in d.keys():
+            if key == 'Date' or key == 'Time':
+                val = td[key].strip()
+            elif key in td and td[key].strip() != 'nan':
+                val = float(td[key])
             else:
-                val = float(data[index])
+                val = _np.nan
             
-            if len(d[key]) > 2000:
+            if len(d[key]) > 2000 and memory_reduce:
                 del d[key][0] 
             d[key].append(val)
         return d
@@ -351,17 +400,28 @@ class plotter:
             keys = file.readline().strip('\n').split(',')
             self.hashDict = self._hashDict_values_length_keeper(keys, dict_by_date, 'Date')
             for data in csv.reader(file, delimiter = ','): # O(1)
-                dict_by_date = self._hashDict_append(data, dict_by_date) # O(n)
+                dict_by_date = self._hashDict_append(keys, data, dict_by_date, memory_reduce = False) # O(n)
         return dict_by_date
 
-        
-            
-            
+    def _update_status(self):
+        '''
+        Check logger status and device status
+        '''
+        current_exe = os.popen('wmic process get description').read().strip().replace(' ', '').split('\n\n')
+        self.current_device_dict = {'Logger' : True if 'pyB12logger_running.exe' in current_exe or 'pyB12logger_debug.exe' in current_exe else False}
+        self.address_dict = {}
+        self.deviceConfig.read(self.deviceConfigDirFile)
+        self.commandConfig.read(self.commandConfigFile)
+        addresses = self.deviceConfig['GENERAL']['device_addresses'].replace(' ', '').split(',')
+        for address in addresses:
+            model_number = self.deviceConfig[address]['model_number'].replace("'", '')
+            if model_number in self.commandConfig.keys():
+                self.current_device_dict[model_number] = eval(self.deviceConfig[address]['device_status'].strip())
+                self.address_dict[model_number] = address
+                
+        if self.current_device_dict != self.last_device_dict: # some updates occur
+            self.last_device_dict = self.current_device_dict.copy()
 
-
-            
-            
-            
 
 
         

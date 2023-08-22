@@ -81,8 +81,14 @@ class DEVICE:
                         self.activeDevices.remove(inst)
                         self.activeAddresses.remove(address) 
 
-                with open(self.deviceConfigDirFile, 'w') as conf:
+                with open(self.deviceConfigDirFile, 'w') as conf: ## Change configuration file
                     self.deviceConfig.write(conf)
+            
+            # When the device is off
+            if self.deviceConfig[address]['device_status'] == 'False' and address in self.activeAddresses: # if the device status is False and in active device
+                self.newFile = 1
+                self.activeDevices.remove(inst)
+                self.activeAddresses.remove(address) 
 
         if self.errorFlag: # this will force whole program restart in logger.py
             raise ConnectionError('Connection Restarts')
@@ -107,22 +113,22 @@ class DEVICE:
                 self.newFile = 0
 
         today = datetime.date.today()
-        data = [str(today), str(datetime.datetime.now().strftime("%H:%M:%S"))]
-        for index, (inst, address) in enumerate(zip(self.activeDevices, self.activeAddresses)):
+        data = {'Date': str(today), 'Time': str(datetime.datetime.now().strftime("%H:%M:%S"))}
+        for inst, address in zip(self.activeDevices, self.activeAddresses):
             model = self.deviceConfig[address]['model_number'].replace("'", '')
             split_sign = self.deviceConfig[address]['split_sign'].replace("'", '')
             data_index = int(self.deviceConfig[address]['data_index'])
             if model in self.commandConfig.keys():
                 for item, command in self.commandConfig[model].items():
                     try: 
-                        data.append(inst.query(command).strip('\n').strip('\r').split(split_sign)[data_index])
-                    except Exception as err:
+                        data[item.strip()] = inst.query(command).strip('\n').strip('\r').split(split_sign)[data_index]
+                    except Exception as err: # this handles the issue that devices disconnected during the query
                         self.debugLogger.info(err)
-                        data.append('0')
+                        data[item.strip()] = 'nan'
                         self.newFile = 1
         if self.queryItems and self.activeAddresses:
             with open(self.logFile, 'a') as f:
-                f.write('%s' %', '.join(data) + '\n')
+                f.write('%s' %', '.join(list(data.values())) + '\n')
 
             if os.path.getsize(self.logFile) > self.fileSize:
                 self.newFile = 1             
