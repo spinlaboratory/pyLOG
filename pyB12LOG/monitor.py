@@ -324,7 +324,10 @@ class monitor:
             if key == 'Date' or key == 'Time':
                 val = td[key].strip()
             elif key in td and td[key].strip() != 'nan':
-                val = float(td[key])
+                try:
+                    val = float(td[key])
+                except:
+                    val = int(td[key], base = 16) # convert 16-bit hex value
             else:
                 val = _np.nan
             
