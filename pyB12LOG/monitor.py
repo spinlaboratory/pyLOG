@@ -9,7 +9,10 @@ Company: Bridge 12 Technologies, Inc
 """
 
 import os
+import subprocess
 import numpy as _np
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import csv
 from collections import Counter
@@ -77,6 +80,7 @@ class monitor:
         color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC'] * (len(self.items) // 4 + 1) 
 
         # init figure
+        plt.ion()
         fig = plt.figure(1, figsize = (16,12))
         plt.subplots_adjust(left=0.25, bottom = 0.25)
         ax = fig.add_subplot(1,1,1)
@@ -138,19 +142,17 @@ class monitor:
             elif label == 'Logger':
                 current_exe = os.popen('wmic process get description').read().strip().replace(' ', '').split('\n\n')
                 hashDict = Counter(current_exe)
-                if 'pyB12logger_running.exe' not in hashDict and 'pyB12logger_debug.exe' not in hashDict and self.current_device_dict[label] == True:
-                    os.startfile('pyB12logger_running.exe')
-                    print('pyB12logger starts')
-                elif 'pyB12logger_running.exe' in hashDict or 'pyB12logger_debug.exe' in hashDict and self.current_device_dict[label] == False:
+                if 'pyB12logger_running.exe' not in hashDict and self.current_device_dict[label] == True:
+                    subprocess.Popen('pyB12logger_running.exe', creationflags = subprocess.CREATE_NO_WINDOW)
+                    print('pyB12logger started')
+                elif 'pyB12logger_running.exe' in hashDict and self.current_device_dict[label] == False:
                     os.system("taskkill /im pyB12logger_running.exe /F")
-                    os.system("taskkill /im pyB12logger_debug.exe /F")
-                    print('pyB12logger stops')
+                    print('pyB12logger stopped')
             
             with open(self.deviceConfigDirFile, 'w') as conf: ## Change configuration file
                 self.deviceConfig.write(conf)
 
         check_device.on_clicked(callback_device)
-
 
         # slider bar and reset for zooming
         self.slider_pnts = int(self.max_pnts / 2)
@@ -214,8 +216,11 @@ class monitor:
             self.selected_date = False
         reset_button.on_clicked(reset)
 
+        fig.show() # inital plotting
+
         while(plt.fignum_exists(1)):
             self._update_status()
+            self._update_check_button(check_device)
             self.logRead() # check if new log creates
             # where = self.f.tell() # (option) f current position of pointer
             line = self.f.readline().strip('\n')
@@ -283,9 +288,7 @@ class monitor:
                 del x_label
                 del ys
 
-            plt.pause(0.01) # showing new plot
-    
-        plt.show()
+            fig.canvas.flush_events() # showing new plot by flushing event
 
     def _hashDict_values_length_keeper(self, keys, d, checker):
         '''
@@ -321,7 +324,10 @@ class monitor:
             if key == 'Date' or key == 'Time':
                 val = td[key].strip()
             elif key in td and td[key].strip() != 'nan':
-                val = float(td[key])
+                try:
+                    val = float(td[key])
+                except:
+                    val = int(td[key], base = 16) # convert 16-bit hex value
             else:
                 val = _np.nan
             
@@ -408,7 +414,7 @@ class monitor:
         Check logger status and device status
         '''
         current_exe = os.popen('wmic process get description').read().strip().replace(' ', '').split('\n\n')
-        self.current_device_dict = {'Logger' : True if 'pyB12logger_running.exe' in current_exe or 'pyB12logger_debug.exe' in current_exe else False}
+        self.current_device_dict = {'Logger' : True if 'pyB12logger_running.exe' in current_exe else False}
         self.address_dict = {}
         self.deviceConfig.read(self.deviceConfigDirFile)
         self.commandConfig.read(self.commandConfigFile)
@@ -422,6 +428,16 @@ class monitor:
         if self.current_device_dict != self.last_device_dict: # some updates occur
             self.last_device_dict = self.current_device_dict.copy()
 
+    def _update_check_button(self, check: matplotlib.widgets.CheckButtons):
+        '''
+        Logic status check on the logger and devices and set status to check buttons
+        '''
+        check.eventson = False
+        status = check.get_status()
+        for i, (check_status, device_status) in enumerate(zip(status, self.current_device_dict.values())):
+            if (check_status != device_status):
+                check.set_active(i)
+        check.eventson = True
 
 
         
