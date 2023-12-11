@@ -6,8 +6,16 @@ import os
 import sys
 import argparse
 import shutil
+import subprocess
 from collections import Counter
 from .pyB12LOG import *
+
+#auto start and adding icon to desktop (public)
+startup_folder = os.path.normpath('C:/ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp/')
+desktop_folder = os.path.normpath('C:/Users/Public/Desktop/')
+source_running_logger = os.path.dirname(sys.executable) + '/scripts/pyB12logger_running.exe' 
+source_monitor = os.path.dirname(sys.executable) + '/scripts/pyB12monitor.exe' 
+
 
 def main_func():
 
@@ -54,29 +62,21 @@ def main_func():
         current_exe = os.popen('wmic process get description').read().strip().replace(' ', '').split('\n\n')
         hashDict = Counter(current_exe) 
 
-        #auto start and adding icon to desktop (public)
-        startup_folder = os.path.normpath('C:/ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp/')
-        desktop_folder = os.path.normpath('C:/Users/Public/Desktop/')
-        source_running_logger = os.path.dirname(sys.executable) + '/scripts/pyB12logger_running.exe' 
-        source_monitor = os.path.dirname(sys.executable) + '/scripts/pyB12monitor.exe' 
-
-
-        if 'pyB12logger_running.exe' in hashDict and hashDict['pyB12logger_running.exe'] > 0 or 'pyB12logger_debug.exe' in hashDict and hashDict['pyB12logger_debug.exe'] > 0:
+        if 'pyB12logger_running.exe' in hashDict and hashDict['pyB12logger_running.exe'] > 0:
             print('pyB12logger has started already.')
             return 
         
         else:
             if args.debug == 'False':          
-                os.startfile('pyB12logger_running.exe')
-                print('pyB12logger starts')
+                subprocess.Popen('pyB12logger_running.exe', creationflags = subprocess.CREATE_NO_WINDOW)
+                print('pyB12logger started')
             elif args.debug == 'True': 
-                os.startfile('pyB12logger_debug.exe')
-                print('pyB12logger debug mode starts')
+                os.startfile('pyB12logger_running.exe')
+                print('pyB12logger debug mode started')
     
     elif args.status == 'stop':
         os.system("taskkill /im pyB12logger_running.exe /F")
-        os.system("taskkill /im pyB12logger_debug.exe /F")
-        print('pyB12logger stops')
+        print('pyB12logger stopped')
     else: # ignore
         return
 
