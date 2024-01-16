@@ -27,7 +27,7 @@ class DEVICE:
         self.deviceConfig = ConfigParser()
 
         self.commandConfigFile = deviceConfigDirHome +'/B12TLOG_Config/command.cfg'
-        self.commandConfig = ConfigParser()
+        self.commandConfig = ConfigParser() 
 
         self.logDir = deviceConfigDirHome + '/B12TLOG'
 
@@ -36,6 +36,14 @@ class DEVICE:
         self.activeAddresses = []
         self.queryItems = []
         self.newFile = 1
+    
+    # def _alise_checker(self):
+    #     listDir = os.listdir(self.deviceConfigDir)
+        
+    #     # create alise file if not exists
+    #     if 'alise.cfg' not in listDir:
+    #         items = []
+    #         for key in 
 
     def _update_connect(self):
         self.deviceConfig.read(self.deviceConfigDirFile)
