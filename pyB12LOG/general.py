@@ -20,6 +20,7 @@ rm = pyvisa.ResourceManager()
 class DEVICE:
     def __init__(self, debugLogger):
 
+        self.debugLogger= debugLogger
         self.deviceConfigDirHome = CONFIG['CONFIG']['log_folder_location'][1:-1]
         self.fileSize = int(CONFIG['CONFIG']['save_file_size_kb']) * 1024
 
@@ -31,12 +32,11 @@ class DEVICE:
         self._update_command() 
 
         self.detailFile = self.deviceConfigDirHome +'/B12TLOG_Config/device_detail.cfg'
-        self._create_detail()
         self.detail= ConfigParser()
+        self._create_detail()
         self._update_detail()
         self.logDir = self.deviceConfigDirHome + '/B12TLOG'
 
-        self.debugLogger= debugLogger
         self.activeDevices = []
         self.activeAddresses = []
         self.queryItems = []
@@ -102,19 +102,25 @@ class DEVICE:
         self.commandConfig.read(self.commandConfigFile)
     
     def _create_detail(self):
+        list_of_item = ['ALIAS', 'VALUE', 'VISIBILITY']
         # if detail file is not existing, generate new file
         if 'device_detail.cfg' not in os.listdir(self.deviceConfigDirHome +'/B12TLOG_Config/'):
             detail = open(self.detailFile, 'a')
-            detail.write('[ALIAS]')
+            for item in list_of_item:
+                detail.write('[%s]\n' %item)
             detail.close()
-            
-        # check detail file is valid: first line must be [ALIAS]
-        with open(self.detailFile, 'r') as detail:
-            first_line = detail.readline().strip('\n')
 
-        if first_line != "[ALIAS]": 
+        self.detail.read(self.detailFile)    
+        # check detail file is valid: list_of_item should be included in the 
+        detail_valid = True
+        for item in list_of_item:
+            if item not in list(self.detail.keys()):
+                detail_valid = False
+
+        if not detail_valid: 
             # backup the comprise file and create a new one
-            os.rename(self.detailFile, self.deviceConfigDirHome +'/B12TLOG_Config/device_detail_compromised.cfg') 
+            os.rename(self.detailFile, self.deviceConfigDirHome +'/B12TLOG_Config/device_detail_compromised.cfg')
+            self.detail= ConfigParser() # refresh the detail variable
             self._create_detail() # repeat the function itself
             self.debugLogger.info('Detail file is compromised. New file is created')
 
@@ -123,11 +129,13 @@ class DEVICE:
         self.detail.read(self.detailFile)
         for value in self.commandConfig.values():
             for key in value.keys():
+                print(key, list(self.detail['ALIAS']))
                 if key not in self.detail['ALIAS']:
                     self.detail['ALIAS'][key] = key
                     update_detail = True
                 else:
                     update_detail = False
+        
         if update_detail: # write to file only when the command changes while logger is running
             with open(self.detailFile, 'w') as conf:
                 self.detail.write(conf)
