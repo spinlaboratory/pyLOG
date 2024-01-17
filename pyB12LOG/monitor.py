@@ -480,7 +480,15 @@ class monitor:
         with open(self.detailFile, 'w') as conf:
             self.detail.write(conf)
         
-
+    def _get_limits_by_item(self):
+        if self.detail_availability:
+            self.minimum = {key: self.detail['VALUE'][key+'_min'] for key in self.items}
+            self.maximum = {key: self.detail['VALUE'][key+'_max'] for key in self.items}
+            self.static = {key: self.detail['VALUE'][key+'_static'] for key in self.items}
+        else:
+            self.minimum = {key: None for key in self.items}
+            self.maximum = {key: None for key in self.items}
+            self.static = {key: None for key in self.items}
 
 
 
