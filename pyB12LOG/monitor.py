@@ -56,6 +56,7 @@ class monitor:
         self.last_device_dict = {}
         self._update_status()
         self.logRead()
+        self.warningDict = {}
         self.max_pnts = len(self.hashDict['Date'])
         self.plot()
 
@@ -100,6 +101,7 @@ class monitor:
         # initial plotting
         self._get_label_by_item()
         self._get_visibility_by_item()
+        self._get_limits_by_item()
         for index, (y, color, item) in enumerate(zip(ys, color_lists, self.items)):
             l, = ax.plot(x, y, color, label = self.labels[item], visible = self.visible[item])
             self.lines_by_label[l.get_label()] = l
@@ -275,6 +277,7 @@ class monitor:
                 ax.clear() # clean figure
                 del self.lines_by_label # release memory
                 self.lines_by_label = {}
+                warning = self._get_warning_by_item(ys)
                 for index, (y, color, item) in enumerate(zip(ys, color_lists, self.items)):
                     label = self.labels[item]
                     if self.visibility_by_label[label]:
@@ -283,17 +286,21 @@ class monitor:
                         l, = ax.plot([], [], label = label)
                     l.set_visible(self.visibility_by_label[label])
                     self.lines_by_label[l.get_label()] = l
+                
+                
                 ax.set_xticks(x_ticks)
                 ax.set_xticklabels(x_label)
                 ax.set_xlabel('Time')
                 ax.grid(ls = ':')
+                if warning:
+                    ax.text(0.8, 1.1, warning, fontsize = 12, color = 'red', horizontalalignment='left', verticalalignment='top', transform=ax.transAxes)
                 if self.selected_file:
                     ax.set_title(self.current_selected_file)
                 elif self.selected_date:
                     ax.set_title('pyB12monitor\n%s - %s' %(self.dict_by_date['Date'][0] + ' ' + self.dict_by_date['Time'][0], self.dict_by_date['Date'][-1] + ' ' + self.dict_by_date['Time'][-1]))
                 else:
                     ax.set_title('pyB12monitor')
-
+                
                 self.update_figure = False
                 self.update_visibility = False
 
@@ -489,6 +496,45 @@ class monitor:
             self.minimum = {key: None for key in self.items}
             self.maximum = {key: None for key in self.items}
             self.static = {key: None for key in self.items}
+        
+    def _get_warning_by_item(self, values):
+        '''
+        Set warning base on the item
+        
+        Args:
+            values: the static or dynamic list of value in active plot figure
+            item: the key for the dictionary in the hashDict
+        
+        Returns:
+            warnings (str): a string of warning. Eg. Warning: Power 2, Power 3
+            
+        '''
+        if not self.warningDict:
+            for item in self.items:
+                self.warningDict[item] = False
+        for index, item in enumerate(self.items):
+            max_value = self.maximum[item]
+            min_value = self.minimum[item]
+            static_value = self.static[item]
+            
+            if max_value:
+                self.warningDict[item] = any([x > float(max_value) for x in values[index]])
+            elif min_value:
+                self.warningDict[item] = any([x < float(min_value) for x in values[index]])
+            elif static_value:
+                self.warningDict[item] = any([x != float(static_value) for x in values[index]])
+        
+        warning = ''
+        if any(list(self.warningDict.values())):
+            if not warning:
+                warning += 'Warning: '
+            
+            for key, value in self.warningDict.items():
+                if value:
+                    warning += key + ' '
+        return  warning
+        
+        
 
 
 
