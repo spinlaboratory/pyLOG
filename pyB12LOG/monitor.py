@@ -34,7 +34,7 @@ class monitor:
         if 'device_detail.cfg' in os.listdir(deviceConfigDirHome +'/B12TLOG_Config/'):
             self.detail_availability = True
             self.detailFile = deviceConfigDirHome +'/B12TLOG_Config/device_detail.cfg'
-            self.detail = ConfigParser()
+            self.detail = ConfigParser(allow_no_value = True)
             self.detail.read(self.detailFile)
         else:
             self.detail_availability = False
@@ -98,13 +98,10 @@ class monitor:
         self.update_require = 0
 
         # initial plotting
-        if self.detail_availability:
-            self.labels = [self.detail['ALIAS'][key] for key in self.items]
-        else:
-            self.labels = self.items
-
-        for index, (y, color) in enumerate(zip(ys, color_lists)):
-            l, = ax.plot(x, y, color, label = self.labels[index])
+        self._get_label_by_item()
+        self._get_visibility_by_item()
+        for index, (y, color, item) in enumerate(zip(ys, color_lists, self.items)):
+            l, = ax.plot(x, y, color, label = self.labels[item], visible = self.visible[item])
             self.lines_by_label[l.get_label()] = l
             line_colors.append(color)
             self.visibility_by_label[l.get_label()] = l.get_visible() 
@@ -126,6 +123,9 @@ class monitor:
         
         def callback(label):
             self.visibility_by_label[label] = not self.visibility_by_label[label]
+            item = list(self.labels.keys())[list(self.labels.values()).index(label)] # get item from label for saving visibility to the detail file
+            self.visible[item] = not self.visible[item] # update the visible dictionary
+            self._save_visibility_by_item(item, self.visible[item])
             self.update_visibility = True
             self.update_figure = True
 
@@ -275,8 +275,8 @@ class monitor:
                 ax.clear() # clean figure
                 del self.lines_by_label # release memory
                 self.lines_by_label = {}
-                for index, (y, color) in enumerate(zip(ys, color_lists)):
-                    label = self.labels[index]
+                for index, (y, color, item) in enumerate(zip(ys, color_lists, self.items)):
+                    label = self.labels[item]
                     if self.visibility_by_label[label]:
                         l, = ax.plot(x, y, color, label = label)
                     else:
@@ -452,7 +452,39 @@ class monitor:
                 check.set_active(i)
         check.eventson = True
 
+    def _get_label_by_item(self):
+        '''
+        Acquire labels from device_detail config
+        '''
+        if not self.detail_availability:
+            self.labels = {key:key for key in self.items}
+        else:
+            self.labels = {key:self.detail['ALIAS'][key] for key in self.items}
 
+    def _get_visibility_by_item(self):
+        '''
+        Acquire visibility from device_detail config
+        '''
+        if not self.detail_availability:
+            self.visible = {key: True for key in self.items}
+        else:
+            self.visible = {key: eval(self.detail['VISIBILITY'][key]) for key in self.items}
+
+    def _save_visibility_by_item(self, item, visibility):
+        '''
+        Save visibility to device_detail config
+        '''
+        if self.detail_availability:
+            self.detail['VISIBILITY'][item] = str(visibility) 
+
+        with open(self.detailFile, 'w') as conf:
+            self.detail.write(conf)
+        
+
+
+
+
+        
         
 
 
