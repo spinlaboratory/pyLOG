@@ -103,7 +103,7 @@ class monitor:
         self._get_label_by_item()
         self._get_visibility_by_item()
         self._get_limits_by_item()
-        for index, (y, color, item) in enumerate(zip(ys, color_lists, self.items)):
+        for index, (y, color, item) in enumerate(zip(ys, self.color_lists, self.items)):
             l, = ax.plot(x, y, color, label = self.labels[item], visible = self.visible[item])
             self.lines_by_label[l.get_label()] = l
             line_colors.append(color)
@@ -283,7 +283,7 @@ class monitor:
                 del self.lines_by_label # release memory
                 self.lines_by_label = {}
                 warning = self._get_warning_by_item(ys)
-                for index, (y, color, item) in enumerate(zip(ys, color_lists, self.items)):
+                for index, (y, color, item) in enumerate(zip(ys, self.color_lists, self.items)):
                     label = self.labels[item]
                     if self.visibility_by_label[label]:
                         l, = ax.plot(x, y, color, label = label)
@@ -466,7 +466,33 @@ class monitor:
 
         check.eventson = True
 
+    def _get_label_by_item(self):
+        '''
+        Acquire labels from device_detail config
+        '''
+        if not self.detail_availability:
+            self.labels = {key:key for key in self.items}
+        else:
+            self.labels = {key:self.detail['ALIAS'][key] for key in self.items}
 
+    def _get_visibility_by_item(self):
+        '''
+        Acquire visibility from device_detail config
+        '''
+        if not self.detail_availability:
+            self.visible = {key: True for key in self.items}
+        else:
+            self.visible = {key: eval(self.detail['VISIBILITY'][key]) for key in self.items}
+
+    def _save_visibility_by_item(self, item, visibility):
+        '''
+        Save visibility to device_detail config
+        '''
+        if self.detail_availability:
+            self.detail['VISIBILITY'][item] = str(visibility) 
+
+        with open(self.detailFile, 'w') as conf:
+            self.detail.write(conf)
         
     def _get_limits_by_item(self):
         if self.detail_availability:
