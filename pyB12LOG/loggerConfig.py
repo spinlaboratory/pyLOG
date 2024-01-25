@@ -14,7 +14,6 @@ Company: Bridge 12 Technologies. Inc
 
 import time
 import os
-import logging
 from .config.config import CONFIG # this will automatically duplicate the config file to default folder
 from configparser import ConfigParser
 
@@ -24,11 +23,11 @@ device_default = {  'status': False,
                     'baud_rate': 9600,
                     'termination': '\n',
                     'data_bits': 8,
-                    'flow_controls': None,
+                    'flow_control': None,
                     'parity': None,
                     'stop_bits': None,
-                    'split_sign': ',',
-                    'data_index': 0,}
+                    'delimiter': ',',
+                    'index': 0,}
 
 # command format in config file: variable: command, alias, min, max, static
 command_default = { 'command': None,
@@ -56,7 +55,7 @@ class loggerConfig:
 
         else:
             # default directory and file name
-            config_dir = CONFIG['SETTINGS']['log_folder_location'][1:-1] + '/B12TLOG_Config/'
+            config_dir = CONFIG['SETTINGS']['log_folder_location'] + '/B12TLOG_Config/'
             config_name = 'config.cfg' 
             config_file = config_dir + config_name  
             
@@ -131,13 +130,7 @@ class loggerConfig:
                 else:
                     command_info[key] = eval(value)
 
-        return command_info
-                
-
-
-
-                        
+        return command_info               
     
-
 if __name__ == '__main__':
-    loggerConfig()
+    config = loggerConfig()

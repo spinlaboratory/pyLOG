@@ -77,7 +77,7 @@ def _get_log_config(configname, key = None):
             os.mkdir(log_dir) 
         
         log_public_config = log_dir + '/' + configname
-        
+
         if configname not in os.listdir(log_dir):
             shutil.copy(log_global_config, log_dir + '/' + configname)
         
