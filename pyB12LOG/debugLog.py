@@ -7,21 +7,23 @@ Company: Bridge 12 Technologies. Inc
 '''
 
 import logging
+from .loggerConfig import *
 
 class debugLog:
-    def __init__(self, log_dir: str):
+    def __init__(self, config_file: str = None):
+        config = loggerConfig(config_file)
+        settings = config.settings 
+        log_dir = settings['log_folder_location'] + '/B12TLOG/'
 
         logpath = log_dir + '/debug_log.txt'
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.DEBUG)
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
         ch = logging.FileHandler(str(logpath))
         ch.setLevel(logging.INFO)
         ch2 = logging.StreamHandler()
         ch2.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s - [%(filename)s:%(lineno)d] - %(levelname)s - %(message)s')
         ch.setFormatter(formatter)
         ch2.setFormatter(formatter)
-        logger.addHandler(ch)
-        logger.addHandler(ch2)
-
-        return logger
+        self.logger.addHandler(ch)
+        self.logger.addHandler(ch2)

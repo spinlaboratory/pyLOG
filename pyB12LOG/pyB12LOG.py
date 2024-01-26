@@ -18,33 +18,41 @@ class pyB12LOG:
     def __init__(self, config_file: str = None):
         
         config = loggerConfig(config_file)
-        settings = config.settings 
-        commands = config.commands # dictionary {model: {variable: {command, alias, min, max, static}}}
-        device_config = config.devices
-        
-        self.log_dir = settings['log_folder_location'] + '/B12TLOG/'
-        self.delay = int(settings['log_interval'])
-        self.max_size = int(settings['save_file_size_kb'])
+        self.debugLogger = debugLog(config_file).logger
+        self.settings = config.settings 
+        self.commands = config.commands # dictionary {model: {variable: {command, alias, min, max, static}}}
+        self.device_config = config.devices
+
+        self.log_dir = self.settings['log_folder_location'] + '/B12TLOG/'
+        self.delay = int(self.settings['log_interval'])
+        self.max_size = int(self.settings['save_file_size_kb'])
         
         self._checkDirectory()
-        self.last_query_time = None
-        self.devices = DEVICE(device_config) # establish communication 
-        self.data_by_variable = self._getDataDictByVariable(commands) # initial empty dictionary for storing data
+        self.devices = DEVICE(config, self.debugLogger) # establish communication 
+        self.data_by_variable = self._getDataDictByVariable(self.commands) # initial empty dictionary for storing data
         
         self.header = self._makeLogHeader()
-        self._createNewLog()
-        while (1):
-            self.log(commands, device_config)
-    
-    def log(self, commands, device_config):
-        now = time.time()
+        self.last_query_time = None
+        self.current_log_file = None
 
+
+    def log(self):
+        '''
+        Send command to a valid device, analyze return and save data to log file
+
+        It runs one time only.  
+        '''
+        if not self.current_log_file:
+            self.debugLogger.info('new log file created')
+            self._createNewLog()
+
+        now = time.time()
         if not self.last_query_time or now - self.last_query_time > self.delay:
 
             devices_info = self.devices.devices_info # dictionary: {model: {status, config_status, device, id_command}}
-            for name, info in commands.items():
-                delimiter = device_config[name]['delimiter']
-                index = device_config[name]['index']
+            for name, info in self.commands.items():
+                delimiter = self.device_config[name]['delimiter']
+                index = self.device_config[name]['index']
                 device = devices_info[name]['device']
                 for variable in info.keys():
                     if self.devices.checkDeviceStatus(name): # check the connection of a device
@@ -60,7 +68,8 @@ class pyB12LOG:
             self.last_query_time = now
             
             if self._checkFileSize(): # exceed the maximum file size
-                self._createNewLog() # create log with header
+                if self._createNewLog(): # create log with header
+                    self.debugLogger.info('File size exceed, new log file created')
 
             self._saveData()
 
@@ -119,7 +128,6 @@ class pyB12LOG:
         else:
             return False
 
-
     def _getDataDictByVariable(self, command_dict: dict):
         '''
         Get the variable list based on the model and it's command dictionary 
@@ -155,23 +163,6 @@ class pyB12LOG:
         data = string.split(delimiter)[index]
 
         return data
-
-    
-        # while(1):
-            # print(self.devices.devices_status['437B']['device'].query('*IDN?'))
-        
-        # if time.time() - self.lastCheckTime > self.timeDelay:
-        #     self.logStartTime = time.time()
-        #     self.device.log()
-        #     self.lastCheckTime = time.time()
-        #     self.logDeltaTime = self.lastCheckTime - self.logStartTime
-            
-        #     if self.firstLog:
-        #         self.debugLogger.info('Log interval of %0.1f s. Logging takes %0.1f s to complete.' %(self.timeDelay, self.logDeltaTime))
-        #         self.firstLog = False
-        #     if self.logDeltaTime > self.timeDelay:
-        #         self.debugLogger.info('Log interval of %0.1f s is too short. Logging takes %0.1f s to complete. Log interval is set to %0.1f s.' %(self.timeDelay, self.logDeltaTime, self.logDeltaTime + 0.1))
-        #         self.timeDelay = self.logDeltaTime + 0.1
 
 if __name__ == '__main__':
     pyB12LOG()
