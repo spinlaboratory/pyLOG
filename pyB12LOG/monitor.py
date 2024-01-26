@@ -17,76 +17,71 @@ import matplotlib.pyplot as plt
 import csv
 from collections import Counter
 from matplotlib.widgets import Button, RadioButtons, CheckButtons, Slider, TextBox
-from .config.config import CONFIG
-from configparser import ConfigParser
+from .loggerConfig import *
+from .debugLog import *
 
 class monitor:
     def __init__(self, number_of_file = 10):
-        deviceConfigDirHome = CONFIG['CONFIG']['log_folder_location'][1:-1]
-        self.logDir = deviceConfigDirHome + '/B12TLOG/'
 
-        self.deviceConfigDirFile = deviceConfigDirHome +'/B12TLOG_Config/device_config.cfg'
-        self.deviceConfig = ConfigParser()
+        config = loggerConfig()
+        self.settings = config.settings 
+        self.commands = config.commands
+       
+        self.log_dir = self.settings['log_folder_location'] + '/B12TLOG/'
 
-        self.commandConfigFile = deviceConfigDirHome +'/B12TLOG_Config/command.cfg'
-        self.commandConfig = ConfigParser()
+        self.debugLogger = debugLog().logger
 
-        if 'device_detail.cfg' in os.listdir(deviceConfigDirHome +'/B12TLOG_Config/'):
-            self.detail_availability = True
-            self.detailFile = deviceConfigDirHome +'/B12TLOG_Config/device_detail.cfg'
-            self.detail = ConfigParser(allow_no_value = True)
-            self.detail.read(self.detailFile)
-        else:
-            self.detail_availability = False
-
-        self.header = None
-        self.hashDict = {}
-        self.log_list = os.listdir(self.logDir)
+        self.data_dict = {}
+        self.log_list = os.listdir(self.log_dir)
         self.f = None
         self.log_index = 0
         self.current_log = None
         self.update_figure = True
         self.static_figure = False
-        # self.update_visibility = False
+        self.update_visibility = False
         self.selected_file = False
         self.selected_date = False
         self.current_selected_file = None
         self.number_of_file = number_of_file
+        self.limit_by_variable = {}
+        self.warning_dict = {}
+        self.last_warning_time = None
 
-        self.last_device_dict = {}
-        self._update_status()
         self.logRead()
-        self.warningDict = {}
-        self.max_pnts = len(self.hashDict['Date'])
+        self.max_pnts = len(self.data_dict['Date'])
+        self._getVariableDict()
+        self._getAliasByVariable()
+        self._getWarningValuesByVariable()
+        
         self.plot()
 
     def logRead(self):
         del self.log_list # release memory
-        self.log_list = [log for log in os.listdir(self.logDir) if 'log_' in log][-1*self.number_of_file:]
+        self.log_list = [log for log in os.listdir(self.log_dir) if 'log_' in log][-1*self.number_of_file:]
         while self.current_log != self.log_list[-1]: 
             if self.log_index < self.number_of_file:
                 self.current_log = self.log_list[self.log_index] # update current log
             else:
                 self.current_log = self.log_list[-1]
-            self.f = open(self.logDir + self.current_log, 'r')
+            self.f = open(self.log_dir + self.current_log, 'r')
             self.keys = self.f.readline().strip('\n').split(',')
-            self.hashDict = self._hashDict_values_length_keeper(self.keys, self.hashDict, 'Date')
+            self.data_dict = self._keepDataDictValuesLength(self.keys, self.data_dict, 'Date')
             for data in csv.reader(self.f, delimiter = ','): # O(1)
-                self.hashDict = self._hashDict_append(self.keys, data, self.hashDict) 
+                self.data_dict = self._appendDataDict(self.keys, data, self.data_dict) 
             self.log_index += 1
 
-            self.items = list(self.hashDict.keys())[2:] # get all headers/items
-        
+        self.items = list(self.data_dict.keys())[2:] # get all headers/items
+
     def plot(self):
-        self.time_length = len(self.hashDict['Time'])
+        self.time_length = len(self.data_dict['Time'])
         if self.time_length < self.max_pnts: 
             self.pnts = self.time_length//2
         else:
             self.pnts = self.max_pnts//2
         
-        x, x_ticks, x_label, ys = self._get_plot_values(self.hashDict, self.pnts, self.items)
+        x, x_ticks, x_label, ys = self._getPlotValues(self.data_dict, self.pnts, self.items)
 
-        self.color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC'] * (len(self.items) // 4 + 1) 
+        color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC'] * (len(self.items) // 4 + 1) 
 
         # init figure
         plt.ion()
@@ -96,18 +91,13 @@ class monitor:
         self.visibility_by_label = {}
         self.lines_by_label = {}
         line_colors = []
-        self.line_weight = {}
         self.update_require = 0
 
         # initial plotting
-        self._get_label_by_item()
-        self._get_visibility_by_item()
-        self._get_limits_by_item()
-        for index, (y, color, item) in enumerate(zip(ys, self.color_lists, self.items)):
-            l, = ax.plot(x, y, color, label = self.labels[item], visible = self.visible[item])
+        for index, (y, color) in enumerate(zip(ys, color_lists)):
+            l, = ax.plot(x, y, color, label = self.items[index])
             self.lines_by_label[l.get_label()] = l
             line_colors.append(color)
-            self.line_weight[l.get_label()] = 'bold'
             self.visibility_by_label[l.get_label()] = l.get_visible() 
         ax.set_xticks(x_ticks)
         ax.set_xticklabels(x_label)
@@ -120,18 +110,13 @@ class monitor:
             ax=rax,
             labels=self.lines_by_label.keys(),
             actives=[l.get_visible() for l in self.lines_by_label.values()],
-            label_props={'color': line_colors, 'fontweight': list(self.line_weight.values())},
+            label_props={'color': line_colors},
             frame_props={'edgecolor': line_colors},
             check_props={'facecolor': line_colors},
         )
         
         def callback(label):
             self.visibility_by_label[label] = not self.visibility_by_label[label]
-            self.line_weight[label] = 'light' if self.visibility_by_label[label] == False else 'bold'
-            # self.update_visibility = True
-            item = list(self.labels.keys())[list(self.labels.values()).index(label)] # get item from label for saving visibility to the detail file
-            self.visible[item] = not self.visible[item] # update the visible dictionary
-            self._save_visibility_by_item(item, self.visible[item])
             self.update_visibility = True
             self.update_figure = True
 
@@ -141,37 +126,6 @@ class monitor:
                 fig.canvas.draw_idle()
 
         check.on_clicked(callback)
-
-        # check buttons for showing status of devices
-        rax_device = fig.add_axes([0.01, 0.8, 0.2, 0.15])
-        check_device = CheckButtons(
-            ax = rax_device,
-            labels= list(self.current_device_dict.keys()),
-            actives = list(self.current_device_dict.values()),
-            # label_props={'color': line_colors},
-            # frame_props={'edgecolor': line_colors},
-            # check_props={'facecolor': line_colors},
-        )
-
-        def callback_device(label):
-            self.current_device_dict[label] = not self.current_device_dict[label]
-            if label != 'Logger':
-                address = self.address_dict[label]
-                self.deviceConfig[address]['device_status'] = str(self.current_device_dict[label])
-            elif label == 'Logger':
-                current_exe = os.popen('wmic process get description').read().strip().replace(' ', '').split('\n\n')
-                hashDict = Counter(current_exe)
-                if 'pyB12logger_running.exe' not in hashDict and self.current_device_dict[label] == True:
-                    subprocess.Popen('pyB12logger_running.exe', creationflags = subprocess.CREATE_NO_WINDOW)
-                    print('pyB12logger started')
-                elif 'pyB12logger_running.exe' in hashDict and self.current_device_dict[label] == False:
-                    os.system("taskkill /im pyB12logger_running.exe /F")
-                    print('pyB12logger stopped')
-            
-            with open(self.deviceConfigDirFile, 'w') as conf: ## Change configuration file
-                self.deviceConfig.write(conf)
-
-        check_device.on_clicked(callback_device)
 
         # slider bar and reset for zooming
         self.slider_pnts = int(self.max_pnts / 2)
@@ -215,7 +169,7 @@ class monitor:
         text_box = TextBox(axbox, "Date\n", textalignment="center")
 
         def submit(date):
-            self.dict_by_date = self._logs_by_date(date)
+            self.dict_by_date = self._getLogsByDate(date)
             self.selected_date = True
             self.update_figure = True
             self.static_figure = False # it is false because the update is required, and it will be set to True once update is finished
@@ -236,17 +190,14 @@ class monitor:
         reset_button.on_clicked(reset)
 
         fig.show() # inital plotting
+
         while(plt.fignum_exists(1)):
-            self._update_status()
-            self._update_device_check_button(check_device)
-            # print({'fontweight': list(self.line_weight.values())})
-            check.set_label_props({'fontweight': list(self.line_weight.values())})
             self.logRead() # check if new log creates
             # where = self.f.tell() # (option) f current position of pointer
             line = self.f.readline().strip('\n')
             if line: # if there is non-empty new line
-                self.hashDict = self._hashDict_append(self.keys, line.strip('\n').split(','), self.hashDict)
-                self.time_length = len(self.hashDict['Time'])
+                self.data_dict = self._appendDataDict(self.keys, line.strip('\n').split(','), self.data_dict)
+                self.time_length = len(self.data_dict['Time'])
                 self.update_figure = True        
 
             if self.update_figure and not self.static_figure: 
@@ -256,43 +207,41 @@ class monitor:
                     self.pnts = self.time_length if self.time_length < self.max_pnts else self.max_pnts
                     self.pnts = min(self.slider_pnts, self.pnts)
 
-                    x, x_ticks, x_label, ys = self._get_plot_values(self.hashDict, self.pnts, self.items)
+                    x, x_ticks, x_label, ys = self._getPlotValues(self.data_dict, self.pnts, self.items)
                     
                 # plot static
                 elif self.selected_file:
                     if self.selected_file_reverse_index > len(self.log_list): # avoid out of range
                         self.selected_file_reverse_index = len(self.log_list)
                     self.current_selected_file = self.log_list[-1 * self.selected_file_reverse_index] # self.log_list is constantly being updated
-                    self.selected_file_dict = {key: [] for key in self.hashDict.keys()}
-                    file = open(self.logDir + self.current_selected_file, 'r')
+                    self.selected_file_dict = {key: [] for key in self.data_dict.keys()}
+                    file = open(self.log_dir + self.current_selected_file, 'r')
                     file.readline() # skip 1st line 
                     self.file_length = 0
                     for data in csv.reader(file, delimiter = ','): # O(1)
-                        self.selected_file_dict = self._hashDict_append(self.keys, data, self.selected_file_dict) # O(n)
+                        self.selected_file_dict = self._appendDataDict(self.keys, data, self.selected_file_dict) # O(n)
                         self.file_length += 1                   
                     
-                    x, x_ticks, x_label, ys = self._get_plot_values(self.selected_file_dict, self.file_length, self.items, ticks = 10)
+                    x, x_ticks, x_label, ys = self._getPlotValues(self.selected_file_dict, self.file_length, self.items, ticks = 10)
                     self.static_figure = True # update figure only once
 
                 elif self.selected_date:
-                    x, x_ticks, x_label, ys = self._get_plot_values(self.dict_by_date, len(self.dict_by_date['Date' ]), self.items, ticks = 10)
+                    x, x_ticks, x_label, ys = self._getPlotValues(self.dict_by_date, len(self.dict_by_date['Date' ]), self.items, ticks = 10)
                     self.static_figure = True # update figure only once
 
                 # self.f.seek(where) # (option) find current pointer
                 ax.clear() # clean figure
+                warning = self._setWarningByVariable(ys)
                 del self.lines_by_label # release memory
                 self.lines_by_label = {}
-                warning = self._get_warning_by_item(ys)
-                for index, (y, color, item) in enumerate(zip(ys, self.color_lists, self.items)):
-                    label = self.labels[item]
+                for index, (y, color) in enumerate(zip(ys, color_lists)):
+                    label = self.items[index]
                     if self.visibility_by_label[label]:
                         l, = ax.plot(x, y, color, label = label)
                     else:
                         l, = ax.plot([], [], label = label)
                     l.set_visible(self.visibility_by_label[label])
                     self.lines_by_label[l.get_label()] = l
-                
-                
                 ax.set_xticks(x_ticks)
                 ax.set_xticklabels(x_label)
                 ax.set_xlabel('Time')
@@ -305,9 +254,9 @@ class monitor:
                     ax.set_title('pyB12monitor\n%s - %s' %(self.dict_by_date['Date'][0] + ' ' + self.dict_by_date['Time'][0], self.dict_by_date['Date'][-1] + ' ' + self.dict_by_date['Time'][-1]))
                 else:
                     ax.set_title('pyB12monitor')
-                
+
                 self.update_figure = False
-                # self.update_visibility = False
+                self.update_visibility = False
 
                 del x_ticks
                 del x_label
@@ -315,7 +264,7 @@ class monitor:
 
             fig.canvas.flush_events() # showing new plot by flushing event
 
-    def _hashDict_values_length_keeper(self, keys, d, checker):
+    def _keepDataDictValuesLength(self, keys, d, checker):
         '''
         This function is to make sure all lists in the dictionary have same length
         Args:
@@ -332,7 +281,7 @@ class monitor:
                 d[key] = [0] * len(d[checker]) if d else [] # take care if new item appears with old log, then put all 0 to the front
         return d
 
-    def _hashDict_append(self, keys, data, d, memory_reduce = True):
+    def _appendDataDict(self, keys, data, d, memory_reduce = True):
         '''
         This function is to read file from csv and add data to dictionary
         Args:
@@ -361,7 +310,7 @@ class monitor:
             d[key].append(val)
         return d
     
-    def _get_plot_values(self, dict, pnts, items, ticks = 5):
+    def _getPlotValues(self, dict, pnts, items, ticks = 5):
         '''
         Arg: 
             dict: the dictionary of data
@@ -392,7 +341,7 @@ class monitor:
 
         return x, x_ticks, x_label, ys
     
-    def _logs_by_date(self, date):
+    def _getLogsByDate(self, date):
         '''
         This function generates the temporary dictionary by selected date
 
@@ -402,12 +351,12 @@ class monitor:
         Return:
             dict_by_date: a temporary dictionary by date
         '''
-        dict_by_date = {key: [] for key in self.hashDict.keys()}
+        dict_by_date = {key: [] for key in self.data_dict.keys()}
         date_list = date.replace(' ', '').split('-')
         if len(date_list) < 1 or len(date_list) > 2:
             return
         
-        complete_log_list = [log for log in os.listdir(self.logDir) if 'log_' in log]
+        complete_log_list = [log for log in os.listdir(self.log_dir) if 'log_' in log]
 
         start_date = date_list[0]
         log_list_by_date = [log for log in complete_log_list if start_date in log]
@@ -427,125 +376,86 @@ class monitor:
                 log_list_by_date = complete_log_list[start_log_index: last_log_index + 1]
 
         for log in log_list_by_date:
-            file = open(self.logDir + log, 'r')
+            file = open(self.log_dir + log, 'r')
             keys = file.readline().strip('\n').split(',')
-            self.hashDict = self._hashDict_values_length_keeper(keys, dict_by_date, 'Date')
+            self.data_dict = self._keepDataDictValuesLength(keys, dict_by_date, 'Date')
             for data in csv.reader(file, delimiter = ','): # O(1)
-                dict_by_date = self._hashDict_append(keys, data, dict_by_date, memory_reduce = False) # O(n)
+                dict_by_date = self._appendDataDict(keys, data, dict_by_date, memory_reduce = False) # O(n)
         return dict_by_date
 
-    def _update_status(self):
+    def _getVariableDict(self):
         '''
-        Check logger status and device status
+        Get all information associated to the variable from commands dictionary in the following format:
+        {variable: {alias, min, max, static}}
         '''
-        current_exe = os.popen('wmic process get description').read().strip().replace(' ', '').split('\n\n')
-        self.current_device_dict = {'Logger' : True if 'pyB12logger_running.exe' in current_exe else False}
-        self.address_dict = {}
-        self.deviceConfig.read(self.deviceConfigDirFile)
-        self.commandConfig.read(self.commandConfigFile)
-        addresses = self.deviceConfig['GENERAL']['device_addresses'].replace(' ', '').split(',')
-        for address in addresses:
-            model_number = self.deviceConfig[address]['model_number'].replace("'", '')
-            if model_number in self.commandConfig.keys():
-                self.current_device_dict[model_number] = eval(self.deviceConfig[address]['device_status'].strip())
-                self.address_dict[model_number] = address
-                
-        if self.current_device_dict != self.last_device_dict: # some updates occur
-            self.last_device_dict = self.current_device_dict.copy()
+        self.var_dict = {}
+        for info in self.commands.values():
+            self.var_dict = {**self.var_dict, **info}
 
-    def _update_device_check_button(self, check: matplotlib.widgets.CheckButtons):
+    def _getAliasByVariable(self):
         '''
-        Logic status check on the logger and devices and set status to check buttons
+        Get alias by variable dict from variable dictionary in following format:
+        {variable: alias}
         '''
 
-        check.eventson = False
-        status = check.get_status()
-        for i, (check_status, device_status) in enumerate(zip(status, self.current_device_dict.values())):
-            if (check_status != device_status):
-                check.set_active(i) # Toggle       
+        self.alias_dict = {}
+        for var, value in self.var_dict.items():
+            self.alias_dict[var] = value['alias']
 
-        check.eventson = True
+    
+    def _getWarningValuesByVariable(self):
+        '''
+        Get warning value from variable dictionary in following format:
+        eg. min_dict : {variable: min}
+        '''
 
-    def _get_label_by_item(self):
-        '''
-        Acquire labels from device_detail config
-        '''
-        if not self.detail_availability:
-            self.labels = {key:key for key in self.items}
-        else:
-            self.labels = {key:self.detail['ALIAS'][key] for key in self.items}
+        self.minimum = {}
+        self.maximum = {}
+        self.static = {}
+        for var, value in self.var_dict.items():
+            self.minimum[var] = value['min']
+            self.maximum[var] = value['max'] 
+            self.static[var] = value['static']
 
-    def _get_visibility_by_item(self):
+    def _setWarningByVariable(self, values):
         '''
-        Acquire visibility from device_detail config
-        '''
-        if not self.detail_availability:
-            self.visible = {key: True for key in self.items}
-        else:
-            self.visible = {key: eval(self.detail['VISIBILITY'][key]) for key in self.items}
+        Set warning to True by variable if value is not in the range
 
-    def _save_visibility_by_item(self, item, visibility):
-        '''
-        Save visibility to device_detail config
-        '''
-        if self.detail_availability:
-            self.detail['VISIBILITY'][item] = str(visibility) 
-
-        with open(self.detailFile, 'w') as conf:
-            self.detail.write(conf)
-        
-    def _get_limits_by_item(self):
-        if self.detail_availability:
-            self.minimum = {key: self.detail['VALUE'][key+'_min'] for key in self.items}
-            self.maximum = {key: self.detail['VALUE'][key+'_max'] for key in self.items}
-            self.static = {key: self.detail['VALUE'][key+'_static'] for key in self.items}
-        else:
-            self.minimum = {key: None for key in self.items}
-            self.maximum = {key: None for key in self.items}
-            self.static = {key: None for key in self.items}
-        
-    def _get_warning_by_item(self, values):
-        '''
-        Set warning base on the item
-        
-        Args:
-            values: the static or dynamic list of value in active plot figure
-            item: the key for the dictionary in the hashDict
+        Args: 
+            Values: The plotting values
         
         Returns:
-            warnings (str): a string of warning. Eg. Warning: Power 2, Power 3
-            
+            warnings (str): a string of warning 
         '''
-        if not self.warningDict:
+        if not self.warning_dict:
             for item in self.items:
-                self.warningDict[item] = False
+                self.warning_dict[item] = False
+        
         for index, item in enumerate(self.items):
             max_value = self.maximum[item]
             min_value = self.minimum[item]
             static_value = self.static[item]
             
             if max_value:
-                self.warningDict[item] = any([x > float(max_value) for x in values[index]])
-            elif min_value:
-                self.warningDict[item] = any([x < float(min_value) for x in values[index]])
-            elif static_value:
-                self.warningDict[item] = any([x != float(static_value) for x in values[index]])
-        
-        warning = ''
-        if any(list(self.warningDict.values())):
-            if not warning:
-                warning += 'Warning: '
+                self.warning_dict[item] = any([x > float(max_value) for x in values[index]])
+            if min_value:
+                self.warning_dict[item] = any([x < float(min_value) for x in values[index]])
+            if static_value:
+                self.warning_dict[item] = any([x != float(static_value) for x in values[index]])
             
-            for key, value in self.warningDict.items():
+        warning = ''
+        if any(list(self.warning_dict.values())):         
+            for key, value in self.warning_dict.items():
                 if value:
                     warning += key + ' '
-        return  warning
+
+        if warning:
+            now = time.time()
+            if not self.last_warning_time or now - self.last_warning_time > 10:
+                self.debugLogger.warning(warning)
+                self.last_warning_time = now
+
+        return warning
+
+
         
-        
-
-
-
-        
-        
-
-
