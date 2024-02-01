@@ -1,461 +1,277 @@
 """
-pyB12LOG: The logging program for instrumentations
+Monitor.py: plotting data in real-time or static
 
-monitor.py: plotting data in real-time or static
+1. Read log files
+2. Plot live or static data
+3. Show warning information
+
+It use PyQt 6, there are some terms you need to know before modifying this script
+
+1. 'name': the identification of a curve, and the key word to call the curve line and item
+2. 'item': the curve items, e.g Legend class from PyQt 6
+3. 'line': the data line for plotting, it is a class from PyQt 6
 
 Author: Yen-Chun Huang
 
 Company: Bridge 12 Technologies, Inc
 """
 
-import os
-import subprocess
-import numpy as _np
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
+import os 
+import sys
 import csv
-from collections import Counter
-from matplotlib.widgets import Button, RadioButtons, CheckButtons, Slider, TextBox
+from datetime import datetime
+import numpy as _np
+from PySide6.QtWidgets import QApplication
+from PyQt6 import QtCore
+import pyqtgraph as pg
 from .loggerConfig import *
 from .debugLog import *
 
-class monitor:
-    def __init__(self, number_of_file = 10):
+dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+uiFile = dir_path + '/ui/plotting.ui'
+uiclass, baseclass = pg.Qt.loadUiType(uiFile)
 
-        config = loggerConfig()
-        self.settings = config.settings 
+class MainWindow(uiclass, baseclass):
+    def __init__(self, config_file: str = None):
+        super().__init__()
+        self.setupUi(self)
+        # configuration file
+        config = loggerConfig(config_file)
+        self.settings = config.settings
+        self.file_dir = self.settings['log_folder_location'] + '/B12TLOG/'
         self.commands = config.commands
-       
-        self.log_dir = self.settings['log_folder_location'] + '/B12TLOG/'
 
-        self.debugLogger = debugLog().logger
-
-        self.data_dict = {}
-        self.log_list = os.listdir(self.log_dir)
-        self.f = None
-        self.log_index = 0
-        self.current_log = None
-        self.update_figure = True
-        self.static_figure = False
-        self.update_visibility = False
-        self.selected_file = False
-        self.selected_date = False
-        self.current_selected_file = None
-        self.number_of_file = number_of_file
-        self.limit_by_variable = {}
-        self.warning_dict = {}
-        self.last_warning_time = None
-
-        self.readLog()
-        self.max_pnts = len(self.data_dict['Date'])
-        self._getVariableDict()
-        self._getAliasByVariable()
-        self._getWarningValuesByVariable()
+        # debug log
+        self.debugLogger = debugLog(config_file).logger     
         
-        self.plot()
+        self.getData()
+        self.getPenByName()
+        self.getLine() # initialize plot
 
-    def readLog(self):
-        del self.log_list # release memory
-        self.log_list = [log for log in os.listdir(self.log_dir) if 'log_' in log][-1*self.number_of_file:]
-        while self.current_log != self.log_list[-1]: 
-            if self.log_index < self.number_of_file:
-                self.current_log = self.log_list[self.log_index] # update current log
-            else:
-                self.current_log = self.log_list[-1]
-            self.f = open(self.log_dir + self.current_log, 'r')
-            self.keys = self.f.readline().strip('\n').split(',')
-            self.data_dict = self._keepDataDictValuesLength(self.keys, self.data_dict, 'Date')
-            for data in csv.reader(self.f, delimiter = ','): # O(1)
-                self.data_dict = self._appendDataDict(self.keys, data, self.data_dict) 
-            self.log_index += 1
-
-        self.items = list(self.data_dict.keys())[2:] # get all headers/items
-
-    def plot(self):
-        self.time_length = len(self.data_dict['Time'])
-        if self.time_length < self.max_pnts: 
-            self.pnts = self.time_length//2
-        else:
-            self.pnts = self.max_pnts//2
+        self.hidden_list = self.all_names.copy()
+        self.shown_list = []
         
-        x, x_ticks, x_label, ys = self._getPlotValues(self.data_dict, self.pnts, self.items)
+        self.hiddenListWidget.addItems(self.hidden_list)
 
-        color_lists = ['#F37021', '#46812B', '#4D4D4F', '#A7A9AC'] * (len(self.items) // 4 + 1) 
-
-        # init figure
-        plt.ion()
-        fig = plt.figure(1, figsize = (16,12))
-        plt.subplots_adjust(left=0.25, bottom = 0.25)
-        ax = fig.add_subplot(1,1,1)
-        self.visibility_by_label = {}
-        self.lines_by_label = {}
-        line_colors = []
-        self.update_require = 0
-
-        # initial plotting
-        for index, (y, color) in enumerate(zip(ys, color_lists)):
-            l, = ax.plot(x, y, color, label = self.items[index])
-            self.lines_by_label[l.get_label()] = l
-            line_colors.append(color)
-            self.visibility_by_label[l.get_label()] = l.get_visible() 
-        ax.set_xticks(x_ticks)
-        ax.set_xticklabels(x_label)
-        ax.grid(ls = ':')
-        ax.set_xlabel('Time')
-
-        # check buttons for showing curves
-        rax = fig.add_axes([0.01, 0.4, 0.2, 0.15])
-        check = CheckButtons(
-            ax=rax,
-            labels=self.lines_by_label.keys(),
-            actives=[l.get_visible() for l in self.lines_by_label.values()],
-            label_props={'color': line_colors},
-            frame_props={'edgecolor': line_colors},
-            check_props={'facecolor': line_colors},
-        )
-        
-        def callback(label):
-            self.visibility_by_label[label] = not self.visibility_by_label[label]
-            self.update_visibility = True
-            self.update_figure = True
-
-            if self.static_figure == True:
-                self.ln = self.lines_by_label[label]
-                self.ln.set_visible(not self.ln.get_visible())
-                fig.canvas.draw_idle()
-
-        check.on_clicked(callback)
-
-        # slider bar and reset for zooming
-        self.slider_pnts = int(self.max_pnts / 2)
-        slider_ax = fig.add_axes([0.25, 0.15, 0.65, 0.03], facecolor = '#F37021')
-        sTime = Slider(
-            ax=slider_ax,
-            label='Zoom',
-            valmin= 2,
-            valmax = self.max_pnts,
-            valinit = int(self.max_pnts / 2),
-        )
-        sTime.valtext.set_visible(False)
-        def zoom_update(val):
-            self.slider_pnts = int(sTime.val)
-            self.update_figure = True
-            self.static_figure = False
-            self.selected_file = False
-            self.selected_date = False
-        sTime.on_changed(zoom_update)
-
-        # slider bar and reset for selecting files
-        file_slider_ax = fig.add_axes([0.25, 0.10, 0.65, 0.03], facecolor = '#F37021')
-        sFile = Slider(
-            ax=file_slider_ax,
-            label='Files',
-            valmin = 0,
-            valmax = self.number_of_file,
-            valinit = 0,
-        )
-        sFile.valtext.set_visible(False)
-
-        def file_update(val):
-            self.selected_file_reverse_index = int(sFile.val)
-            self.selected_file = True if self.selected_file_reverse_index else False
-            self.static_figure = False # it is false because the update is required, and it will be set to True once update is finished
-            self.update_figure = True
-        sFile.on_changed(file_update)
-
-        # textbox for plotting specific range
-        axbox = fig.add_axes([0.05, 0.1, 0.15, 0.075])
-        text_box = TextBox(axbox, "Date\n", textalignment="center")
-
-        def submit(date):
-            self.dict_by_date = self._getLogsByDate(date)
-            self.selected_date = True
-            self.update_figure = True
-            self.static_figure = False # it is false because the update is required, and it will be set to True once update is finished
-
-        text_box.on_submit(submit)
-
-        ## reset
-        resetax = plt.axes([0.92, 0.15, 0.03, 0.03])
-        reset_button = Button(resetax, 'Reset', color='lightgoldenrodyellow', hovercolor='0.975')
-
-        def reset(event):
-            sTime.reset()
-            sFile.reset()
-            self.update_figure = True
-            self.static_figure = False
-            self.selected_file = False
-            self.selected_date = False
-        reset_button.on_clicked(reset)
-
-        fig.show() # inital plotting
-
-        while(plt.fignum_exists(1)):
-            self.readLog() # check if new log creates
-            # where = self.f.tell() # (option) f current position of pointer
-            line = self.f.readline().strip('\n')
-            if line: # if there is non-empty new line
-                self.data_dict = self._appendDataDict(self.keys, line.strip('\n').split(','), self.data_dict)
-                self.time_length = len(self.data_dict['Time'])
-                self.update_figure = True        
-
-            if self.update_figure and not self.static_figure: 
-                if not self.selected_file and not self.selected_date:
-                # real-time figure
-                ## updates plotting information       
-                    self.pnts = self.time_length if self.time_length < self.max_pnts else self.max_pnts
-                    self.pnts = min(self.slider_pnts, self.pnts)
-
-                    x, x_ticks, x_label, ys = self._getPlotValues(self.data_dict, self.pnts, self.items)
-                    
-                # plot static
-                elif self.selected_file:
-                    if self.selected_file_reverse_index > len(self.log_list): # avoid out of range
-                        self.selected_file_reverse_index = len(self.log_list)
-                    self.current_selected_file = self.log_list[-1 * self.selected_file_reverse_index] # self.log_list is constantly being updated
-                    self.selected_file_dict = {key: [] for key in self.data_dict.keys()}
-                    file = open(self.log_dir + self.current_selected_file, 'r')
-                    file.readline() # skip 1st line 
-                    self.file_length = 0
-                    for data in csv.reader(file, delimiter = ','): # O(1)
-                        self.selected_file_dict = self._appendDataDict(self.keys, data, self.selected_file_dict) # O(n)
-                        self.file_length += 1                   
-                    
-                    x, x_ticks, x_label, ys = self._getPlotValues(self.selected_file_dict, self.file_length, self.items, ticks = 10)
-                    self.static_figure = True # update figure only once
-
-                elif self.selected_date:
-                    x, x_ticks, x_label, ys = self._getPlotValues(self.dict_by_date, len(self.dict_by_date['Date' ]), self.items, ticks = 10)
-                    self.static_figure = True # update figure only once
-
-                # self.f.seek(where) # (option) find current pointer
-                ax.clear() # clean figure
-                warning = self._setWarningByVariable(ys)
-                del self.lines_by_label # release memory
-                self.lines_by_label = {}
-                for index, (y, color) in enumerate(zip(ys, color_lists)):
-                    label = self.items[index]
-                    if self.visibility_by_label[label]:
-                        l, = ax.plot(x, y, color, label = label)
-                    else:
-                        l, = ax.plot([], [], label = label)
-                    l.set_visible(self.visibility_by_label[label])
-                    self.lines_by_label[l.get_label()] = l
-                ax.set_xticks(x_ticks)
-                ax.set_xticklabels(x_label)
-                ax.set_xlabel('Time')
-                ax.grid(ls = ':')
-                if warning:
-                    ax.text(0.8, 1.1, warning, fontsize = 12, color = 'red', horizontalalignment='left', verticalalignment='top', transform=ax.transAxes)
-                if self.selected_file:
-                    ax.set_title(self.current_selected_file)
-                elif self.selected_date:
-                    ax.set_title('pyB12monitor\n%s - %s' %(self.dict_by_date['Date'][0] + ' ' + self.dict_by_date['Time'][0], self.dict_by_date['Date'][-1] + ' ' + self.dict_by_date['Time'][-1]))
-                else:
-                    ax.set_title('pyB12monitor')
-
-                self.update_figure = False
-                self.update_visibility = False
-
-                del x_ticks
-                del x_label
-                del ys
-
-            fig.canvas.flush_events() # showing new plot by flushing event
-
-    def _keepDataDictValuesLength(self, keys, d, checker):
+        self.hiddenToShown.clicked.connect(self.showItems) # button to move item from hidden widget to shown widget  
+        self.shownToHidden.clicked.connect(self.hideItems) # button to move item from shown widget to hidden widget
+      
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(300) 
+        self.timer.timeout.connect(self.updateData)
+        self.timer.timeout.connect(self.plot)
+        self.timer.start()
+    
+    def getData(self):
         '''
-        This function is to make sure all lists in the dictionary have same length
+        Get data from logger files
+        '''
+        self.all_data_by_name = {'Date': [], 'Time': [], 'Seconds': []}
+        window_length = int(self.windowLength.text()) 
+        self.file_list = [file for file in os.listdir(self.file_dir) if 'log_' in file]
+        
+        if not self.file_list: 
+            self.debugLogger.error('Logged Data Not Found')
+            return False
+
+        # When the monitor starts or a new file presents
+        for file in self.file_list:
+            f = open(self.file_dir + file, 'r')
+            names = f.readline().strip('\n').split(',')
+            if names[0]:
+                for data in csv.reader(f, delimiter = ','):
+                    self.all_data_by_name = self.addDataToDict(names, data, self.all_data_by_name)
+            
+            if file != self.file_list[-1]: # close the file
+                f.close()
+            else: # leave the current file open for further reading
+                self.current_file = file
+                self.f = f
+                self.names = names
+                self.window_length = window_length
+
+            # for initial data dictionary
+            self.all_names = [name for name in self.all_data_by_name.keys() if name not in ['Date', 'Time', 'Seconds']] # get list of data name except Date, Time and Seconds
+            self.all_x = self.all_data_by_name['Seconds']
+            self.data_by_name = {name: val[-1*window_length:] for name, val in self.all_data_by_name.items() if name not in ['Date', 'Time', 'Seconds']}
+            self.x = self.all_x[-1* window_length:]
+            x_ticks_density = window_length//10
+            self.x_ticks = [(self.x[i], self.all_data_by_name['Time'][-1*window_length:][i]) for i in range(len(self.x))][::x_ticks_density]
+            
+    def updateData(self):
+        '''
+        Update data when new line appears or new file presents
+        '''
+        window_length = int(self.windowLength.text())
+        self.file_list = [file for file in os.listdir(self.file_dir) if 'log_' in file]
+        if self.current_file != self.file_list[-1]:
+            self.f.close() # when new file exist, close the previous file
+            self.current_file = self.file_list[-1]
+            self.f = open(self.file_dir + self.current_file, 'r')
+            self.names = self.f.readline().strip('\n').split(',')
+
+        line = self.f.readline().strip('\n')
+        if line:
+            self.all_data_by_name = self.addDataToDict(self.names, line.strip('\n').split(','), self.all_data_by_name)
+            # self.all_x doesn't need to be updated because it is the reference to self.all_data_by_name['Seconds']
+        
+        if self.window_length != window_length or line:
+            self.window_length = window_length
+            self.data_by_name = {name: val[-1*window_length:] for name, val in self.all_data_by_name.items() if name not in ['Date', 'Time']}
+            self.x = self.all_x[-1*window_length:]
+            x_ticks_density = window_length//10
+            self.x_ticks = [(self.x[i], self.all_data_by_name['Time'][-1*window_length:][i]) for i in range(len(self.x))][::x_ticks_density]
+            self.ax.setTicks([self.x_ticks])
+    
+    def addDataToDict(self, names: list, data, d: dict):
+        '''
+        Add data to target dictionary based on name
+        
         Args:
-            keys: a new list of dictionary key
-            d: current dictionary
-            checker: the key in the dictionary to check the length of all lists
+            names (list): list of key (name) to add to target dictionary
+            data: csv read data
+            d (dict): target dictionary to add data
 
         Return:
-            d: the dictionary that contains same length of lists
+            d (dict): target dictionary with added data
         '''
-        for key in keys:
-            key = key.strip()
-            if key not in d: # if new item is found
-                d[key] = [0] * len(d[checker]) if d else [] # take care if new item appears with old log, then put all 0 to the front
-        return d
+        
+        # temporary dictionary
+        td = {name.strip(): val.strip() for name, val in zip(names, data)}
+        # create empty list if key not exists in dictionary
+        for name in td.keys():
+            if name not in d.keys():
+                d[name] = [_np.nan] * len(d['Date'])
 
-    def _appendDataDict(self, keys, data, d, memory_reduce = True):
-        '''
-        This function is to read file from csv and add data to dictionary
-        Args:
-            items: the items in the current file
-            data: a new data from current file
-            d: existing dictionary
-
-        Return:
-            d: the appended dictionary
-
-        '''
-        td = {key.strip(): val.strip() for key, val in zip(keys, data)}
-        for key in d.keys():
-            if key == 'Date' or key == 'Time':
-                val = td[key].strip()
-            elif key in td and td[key].strip() != 'nan':
+        for name in d.keys():
+            if name in ['Date', 'Time']:
+                val = td[name].strip()
+            elif name == 'Seconds':
+                val = self.getXAxisFromTime(td['Date'].strip(), td['Time'].strip())
+            elif name in td and td[name] != 'nan':
                 try:
-                    val = float(td[key])
+                    val = float(td[name])
                 except:
-                    val = int(td[key], base = 16) # convert 16-bit hex value
-            else:
+                    val = int(td[name], base = 16) # convert 16-bit hex value 
+            elif name:
                 val = _np.nan
+
+            if len(d[name]) > 5000:
+                del d[name][0]
             
-            if len(d[key]) > 2000 and memory_reduce:
-                del d[key][0] 
-            d[key].append(val)
-        return d
-    
-    def _getPlotValues(self, dict, pnts, items, ticks = 5):
+            d[name].append(val)
+        del td # release memory
+        return d  
+
+    def getXAxisFromTime(self, date: str, time: str):
         '''
-        Arg: 
-            dict: the dictionary of data
-            pnts: number of pnts to plot
-            items: the items in the dictionary to plot (exclude time and date)
-            ticks: the number of ticks for plotting
-
-        return:
-            x: a list from 1 to the number of pnts + 1
-            x_ticks: a list with size of 3
-            x_label: the x labels of date and time
-            ys: a list that contains multiple lists.
-
-        '''
-        x = list(range(pnts))
-        step = pnts // (ticks-1)
-        times = 0
-        x_ticks = []
-        x_label = []
-        while times < ticks - 1:
-            index = times * step
-            x_ticks.append(x[index])
-            x_label.append(dict['Date'][-pnts:][index] + '\n' + dict['Time'][-pnts:][index])
-            times += 1
-        x_ticks.append(x[-1])
-        x_label.append(dict['Date'][-pnts:][-1] + '\n' + dict['Time'][-pnts:][-1])
-        ys = [dict[item][-pnts:] for item in items]
-
-        return x, x_ticks, x_label, ys
-    
-    def _getLogsByDate(self, date):
-        '''
-        This function generates the temporary dictionary by selected date
-
-        Args:
-            date: a string of date in 'YYYYMMDD' or 'YYYYMMDD - YYYYMMDD'
-
-        Return:
-            dict_by_date: a temporary dictionary by date
-        '''
-        dict_by_date = {key: [] for key in self.data_dict.keys()}
-        date_list = date.replace(' ', '').split('-')
-        if len(date_list) < 1 or len(date_list) > 2:
-            return
+        Convert Date and Time string to the seconds from 1970/1/1
         
-        complete_log_list = [log for log in os.listdir(self.log_dir) if 'log_' in log]
-
-        start_date = date_list[0]
-        log_list_by_date = [log for log in complete_log_list if start_date in log]
-        start_log_index = complete_log_list.index(log_list_by_date[0]) - 1
-        start_log_index = start_log_index if start_log_index >= 0 else 0 # if start_log_index < 0, force to 0
-        log_list_by_date = [complete_log_list[start_log_index]] + log_list_by_date # add the one more log to get complete log because the first log may start in the middle of the date
-        if len(date_list) == 2:
-            end_date = date_list[1]
-            if len(end_date) != len(start_date) or int(end_date) <= int(start_date):
-                return
-            
-            last_log_index = [index for index, log in enumerate(complete_log_list) if end_date in log][-1]
-            if not last_log_index:
-                return 
-            
-            else:
-                log_list_by_date = complete_log_list[start_log_index: last_log_index + 1]
-
-        for log in log_list_by_date:
-            file = open(self.log_dir + log, 'r')
-            keys = file.readline().strip('\n').split(',')
-            self.data_dict = self._keepDataDictValuesLength(keys, dict_by_date, 'Date')
-            for data in csv.reader(file, delimiter = ','): # O(1)
-                dict_by_date = self._appendDataDict(keys, data, dict_by_date, memory_reduce = False) # O(n)
-        return dict_by_date
-
-    def _getVariableDict(self):
-        '''
-        Get all information associated to the variable from commands dictionary in the following format:
-        {variable: {alias, min, max, static}}
-        '''
-        self.var_dict = {}
-        for info in self.commands.values():
-            self.var_dict = {**self.var_dict, **info}
-
-    def _getAliasByVariable(self):
-        '''
-        Get alias by variable dict from variable dictionary in following format:
-        {variable: alias}
-        '''
-
-        self.alias_dict = {}
-        for var, value in self.var_dict.items():
-            self.alias_dict[var] = value['alias']
-
-    
-    def _getWarningValuesByVariable(self):
-        '''
-        Get warning value from variable dictionary in following format:
-        eg. min_dict : {variable: min}
-        '''
-
-        self.minimum = {}
-        self.maximum = {}
-        self.static = {}
-        for var, value in self.var_dict.items():
-            self.minimum[var] = value['min']
-            self.maximum[var] = value['max'] 
-            self.static[var] = value['static']
-
-    def _setWarningByVariable(self, values):
-        '''
-        Set warning to True by variable if value is not in the range
+        Use seconds as X axis
 
         Args: 
-            Values: The plotting values
+            date (str): in format %Y-%m-%d
+            time (str): in format %H:%M:%S
         
         Returns:
-            warnings (str): a string of warning 
+            seconds (int): seconds from 1970/1/1
         '''
-        if not self.warning_dict:
-            for item in self.items:
-                self.warning_dict[item] = False
+
+        string = date + ' ' + time # in format '%Y-%m-%d %H:%M:%S'
+        datetime_object = datetime.strptime(string, '%Y-%m-%d %H:%M:%S')
+        delta = datetime_object - datetime(1970,1,1)
+
+        return int(delta.total_seconds())
         
-        for index, item in enumerate(self.items):
-            max_value = self.maximum[item]
-            min_value = self.minimum[item]
-            static_value = self.static[item]
-            
-            if max_value:
-                self.warning_dict[item] = any([x > float(max_value) for x in values[index]])
-            if min_value:
-                self.warning_dict[item] = any([x < float(min_value) for x in values[index]])
-            if static_value:
-                self.warning_dict[item] = any([x != float(static_value) for x in values[index]])
-            
-        warning = ''
-        if any(list(self.warning_dict.values())):         
-            for key, value in self.warning_dict.items():
-                if value:
-                    warning += key + ' '
+    def getLine(self):
+        '''
+        Initialize plotting and get line based on name
+        '''
+        self.line_by_name = {} # {name: line}
+        for name, data in self.data_by_name.items(): # loop all names
+            pen = self.pen_by_name[name] # set pen
+            self.line_by_name[name] = self.graphWidget.plot(self.x, 
+                                                           data,
+                                                           name = name, 
+                                                           pen = pen,
+                                                           label = self.x_ticks
+                                                           ) # initialize data plotting and get line for each name
 
-        if warning:
-            now = time.time()
-            if not self.last_warning_time or now - self.last_warning_time > 10:
-                self.debugLogger.warning(warning)
-                self.last_warning_time = now
+        # styles = {"color": "red", "font-size": "18px"}
+        self.graphWidget.setBackground("w")
+        # self.graphWidget.setLabel('bottom', 'Time (min)', **styles)
+        self.graphWidget.showGrid(x = True, y = True)
+        self.legend = self.graphWidget.addLegend()
+        self.ax = self.graphWidget.getAxis('bottom')
+        self.ax.setTicks([self.x_ticks])
 
-        return warning
+        return True
+    
+    def plot(self):
+        '''
+        Plotting data 
+        '''
+        for name in self.all_names: 
+            if name in self.shown_list: # plot line in shown widget
 
+                if not self.legend.getLabel(self.line_by_name[name]): # if not legend, add legend 
+                    self.legend.addItem(self.line_by_name[name], name) 
 
+                self.line_by_name[name].setData(self.x, self.data_by_name[name])       
+            else: # hide line in hidden widget
+                self.legend.removeItem(name) # remove legend
+                self.line_by_name[name].setData([], []) # display empty line
+
+    def hideItems(self):
+        '''
+        Move items from shown list to hidden list, and from shown widget to hidden widget
+        '''
+        selected = self.shownListWidget.selectedItems() # multi selection
+        for item in selected:
+            row = self.shownListWidget.row(item) # get row
+            self.hiddenListWidget.addItem(self.shownListWidget.takeItem(row)) # remove item from shown widget to hidden widget 
+            self.shown_list.remove(item.text()) # add the item from hidden list
+            self.hidden_list.append(item.text()) # remove the item to the shown list
         
+        return True
+
+    def showItems(self):
+        '''
+        Move items from hidden list to shown list, and from hidden widget to shown widget
+        '''
+
+        selected = self.hiddenListWidget.selectedItems() # multi selection
+        for item in selected:
+            row = self.hiddenListWidget.row(item) # get row
+            self.shownListWidget.addItem(self.hiddenListWidget.takeItem(row)) # remove item from hidden widget to shown widget 
+            self.hidden_list.remove(item.text()) # remove the item from hidden list
+            self.shown_list.append(item.text()) # add the item to the shown list
+
+        return True
+
+    def getPenByName(self):
+        '''
+        Set curve color and line style to pen
+
+        Idea: loop color list. If color is the same, use different dash line
+        1. loop the color list. e.g. 1%4 = 1 and 5%4 = 1, so the second and fifth element use the same color 
+        2. loop the dash list. e.g. 1//4%4 = 0 and 5//4%4 = 1, so the second element doesn't have dash line but fifth element use dash line [16, 16]
+
+        '''
+        self.pen_by_name = {} #{name: pen}
+
+        color_list_loop = ['#F37021', '#46812B', '#67AE3E', '#4D4D4F'] # can be extend
+        dash_list_loop = [None, [16, 16], [8, 8], [4, 4]] # can be extend
+
+        for index, name in enumerate(self.all_names):
+            color = color_list_loop[index%len(color_list_loop)] # loop color list
+            dash = dash_list_loop[index//len(color_list_loop)%len(dash_list_loop)] # loop dash line list if same color
+            self.pen_by_name[name] = pg.mkPen(color = color, dash = dash) # set to pen by name
+        
+        return True
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    app.exec()

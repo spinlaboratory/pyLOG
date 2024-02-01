@@ -7,10 +7,8 @@ Author: Yen-Chun Huang
 
 Company: Bridge 12 Technologies, Inc
 """
-import os
+
 import pyvisa
-import time
-import datetime
 from pyvisa.constants import Parity, StopBits
 from .debugLog import *
 
@@ -19,11 +17,8 @@ class DEVICE:
         self.devices_info = {}
         self.rm, self.deviceAddresses = self._getResourceManager()
         self.debug_logger = debug_logger
-        device_config = config.devices
-
-        for name, setting in device_config.items():
-            self.debug_logger.info('Setting: %s' %name)
-            self.devices_info[name] = self._setDevice(setting)
+        self.device_config = config.devices
+        self._setDevice()
 
         self.checkDeviceStatus()
     
@@ -40,44 +35,52 @@ class DEVICE:
 
         return rm, deviceAddresses
         
-    def _setDevice(self, setting: dict):
+    def _setDevice(self, name: str = None):
         '''
         Apply settings to a device and return availability:
         Args:
-            model (str): the model number of device
-            settings (dict): the status of device and the device communication settings for pyVISA
+            name (str): the name of device
         Return:
             device_dict
             {connection_status (bool): the status of device communication
             device (pyVISA): the devices class for sending command
         '''
-        status = setting['device_status']
-        address = setting['address']
-        baud_rate = setting['baud_rate']
-        termination = setting['termination']
-        data_bits = setting['data_bits']
-        flow_control = setting['flow_control']
-        parity = self._parity(setting['parity'])
-        stop_bits = self._stopBits(setting['stop_bits'])
-        id_command = setting['id_command']
+        if name:
+            setting = self.device_config[name]
+            self.debug_logger.info('Setting: %s' %name)
+            status = setting['device_status']
+            address = setting['address']
+            baud_rate = setting['baud_rate']
+            termination = setting['termination']
+            data_bits = setting['data_bits']
+            flow_control = setting['flow_control']
+            parity = self._parity(setting['parity'])
+            stop_bits = self._stopBits(setting['stop_bits'])
+            id_command = setting['id_command']
 
-        if address in self.deviceAddresses:
-            device = self.rm.open_resource(address)
-            device.baud_rate = baud_rate
-            device.data_bits = data_bits
-            if flow_control:
-                device.flow_control = flow_control
-            device.read_termination = termination
-            device.write_termination = termination
-            if parity:
-                device.parity = parity
-            if stop_bits:
-                device.stop_bits = stop_bits   
-        
+            if address in self.deviceAddresses:
+                with self.rm.open_resource(address) as device:
+                    device.baud_rate = baud_rate
+                    device.data_bits = data_bits
+                    if flow_control:
+                        device.flow_control = flow_control
+                    device.read_termination = termination
+                    device.write_termination = termination
+                    if parity:
+                        device.parity = parity
+                    if stop_bits:
+                        device.stop_bits = stop_bits   
+            
+            else:
+                device = None
+
+            self.devices_info[name] = {'status': status, 'config_status': status, 'device': device, 'id_command': id_command}
+            return True
+
         else:
-            device = None
-        
-        return {'status': status, 'config_status': status, 'device': device, 'id_command': id_command}
+            for name in self.device_config.keys():
+                self.devices_info = {}
+                self._setDevice(name)
     
     def checkDeviceStatus(self, name: str = None):
         if name:
@@ -85,14 +88,19 @@ class DEVICE:
             id_command = device_info['id_command']
             device = device_info['device']
             try: 
+                device.open()
                 device.query(id_command)
+                device.close()
+                if not device_info['status']:
+                    self.debug_logger.warning('%s is reconnected' % name)
+                    device_info['status'] = True
                 return True
             except:
                 if device_info['status']: # at the moment when status become disconnected
                     self.debug_logger.warning('%s is disconnected' % name)
-                    self.debug_logger.warning('restart logger to re-connect: %s' %name)
-                device_info['status'] = False
+                    device_info['status'] = False
                 return False
+                
         else:
             for name in self.devices_info.keys():
                 if self.checkDeviceStatus(name):

@@ -10,6 +10,7 @@ Company: Bridge 12 Technologies, Inc
 
 from .device import *
 import time
+import datetime
 import os
 from .loggerConfig import *
 from .debugLog import *
@@ -49,6 +50,7 @@ class pyB12LOG:
         now = time.time()
         if not self.last_query_time or now - self.last_query_time > self.delay:
             
+            self._setTimeInDataDictByVariable() # update time
             devices_info = self.devices.devices_info # dictionary: {model: {status, config_status, device, id_command}}
             for name, info in self.commands.items():
                 delimiter = self.device_config[name]['delimiter']
@@ -57,14 +59,15 @@ class pyB12LOG:
                 for variable in info.keys():
                     if self.devices.checkDeviceStatus(name): # check the connection of a device
                         command = info[variable]['command']
+                        device.open()
                         data_string = device.query(command)
+                        device.close()
                         data = self._returnStringConverter(data_string, delimiter, index)
                     
                     else:
                         data = 'nan' # write nan to not available data
 
                     self.data_by_variable[variable] = data
-                    self._setTimeInDataDictByVariable() # update time
 
             self.last_query_time = now
             
@@ -169,10 +172,10 @@ class pyB12LOG:
         '''
         Update the time in data dictionary by variable
         '''
-
-        self.data_by_variable['Date'] = str(datetime.date.today())
-        self.data_by_variable['Time'] = str(datetime.datetime.now().strftime("%H:%M:%S"))
-
+        today = str(datetime.date.today())
+        now = str(datetime.datetime.now().strftime("%H:%M:%S"))
+        self.data_by_variable['Date'] = today
+        self.data_by_variable['Time'] = now
         return True
 
 
