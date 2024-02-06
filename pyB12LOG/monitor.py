@@ -21,7 +21,7 @@ import sys
 import csv
 from datetime import datetime
 import numpy as _np
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QFileDialog
 from PyQt6 import QtCore
 import pyqtgraph as pg
 from .loggerConfig import *
@@ -55,12 +55,12 @@ class MainWindow(uiclass, baseclass):
         self.getPenByName()
         self.getLine() # initialize plot
 
+        # Shown figures
         self.hidden_list = self.all_names.copy()
         self.shown_list = []
+        self.hiddenListWidget.addItems(self.hidden_list) # by default all hidden
 
-
-
-        self.hiddenListWidget.addItems(self.hidden_list)
+        # Buttons and Menu settings
         self.hiddenToShown.clicked.connect(self.showItems) # button to move item from hidden widget to shown widget  
         self.shownToHidden.clicked.connect(self.hideItems) # button to move item from shown widget to hidden widget
         self.clearWarningText.clicked.connect(self.clearWarning) # button to clear warning message
@@ -164,7 +164,6 @@ class MainWindow(uiclass, baseclass):
 
         else:
             self.staticPlot()
-
         
     def livePlot(self):
         '''
@@ -275,8 +274,8 @@ class MainWindow(uiclass, baseclass):
         self.line_by_name = {} # {name: line}
         for name, data in self.data_by_name.items(): # loop all names
             pen = self.pen_by_name[name] # set pen
-            self.line_by_name[name] = self.graphWidget.plot(self.x, 
-                                                           data,
+            self.line_by_name[name] = self.graphWidget.plot([], 
+                                                           [],
                                                            name = name, 
                                                            pen = pen,
                                                            label = self.x_ticks
@@ -319,21 +318,17 @@ class MainWindow(uiclass, baseclass):
         By default, the plot is live
         '''
         self.plot_type = True # plot is live 
-        self.setToStatic.clicked.connect(self.setStatic)
-        self.setToLive.clicked.connect(self.setLive)
+        self.setToStatic.clicked.connect(self.setStatic) # ok button to set static by date
+        self.setToLive.clicked.connect(self.setLive) # reset button to set plot back to live
+        self.loadFile.triggered.connect(self.loadStaticFile) # menu bar for file selection
     
     def setStatic(self):
         '''
         Set plot type to static if the input is valid, or give the error and set plot type back to live
         '''
-        if not self.fileSelect.currentText():
-            self.getSelectedDataRangeByDate()
-            self.selected_data_by_file = False
-            self.selected_data_by_date = True
-        else:
-            self.getSelectedDataFile()
-            self.selected_data_by_file = True
-            self.selected_data_by_date = False
+        self.getSelectedDataRangeByDate()
+        self.selected_data_by_file = False
+        self.selected_data_by_date = True
 
     def setLive(self):
         self.plot_type = True
@@ -343,19 +338,32 @@ class MainWindow(uiclass, baseclass):
 
     
 ### =============================================== Static Plot by File Name ===============================================
-    def getSelectedDataFile(self):
-        self.temp_data_by_name = {'Date': [], 'Time': [], 'Seconds': []}
-        selected_file = self.fileSelect.currentText()
-        f = open(self.file_dir + selected_file, 'r') 
-        names = f.readline().strip('\n').split(',')
-        names = self.convertNames(names)
+    def loadStaticFile(self):
+        '''
+        Load file from menu bar
+        '''
+        filename, ext = QFileDialog.getOpenFileName(caption = 'Import File', dir = self.file_dir, filter = '*.csv')
+        if filename and 'log_': # if a file is selected and file is valid
+            try:
+                self.temp_data_by_name = {'Date': [], 'Time': [], 'Seconds': []}
+                f = open(filename, 'r')
+                names = f.readline().strip('\n').split(',')
+                names = self.convertNames(names)
+                for data in csv.reader(f, delimiter = ','):
+                    self.temp_data_by_name = self.addDataToDict(names, data, self.temp_data_by_name)
+                f.close()
+                self.plot_type = False
+                self.static_update_request = True
+                self.selected_data_by_file = True
+                self.selected_data_by_date = False
 
-        for data in csv.reader(f, delimiter = ','):
-            self.temp_data_by_name = self.addDataToDict(names, data, self.temp_data_by_name)
+                return True
+            except:
+                self.warningText.appendPlainText('The selected file is invalid or compromised.')
 
-        self.plot_type = False # make plot type to static
-        self.static_update_request = True
-        return True
+        self.static_update_request = False
+        self.selected_data_by_file = False
+        return False
     
 ### ================================================= Static Plot by Date ==================================================
     def getSelectedDataRangeByDate(self):
