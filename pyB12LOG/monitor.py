@@ -55,10 +55,12 @@ class MainWindow(uiclass, baseclass):
         self.getPenByName()
         self.getLine() # initialize plot
 
-        # Shown figures
-        self.hidden_list = self.all_names.copy()
-        self.shown_list = []
-        self.hiddenListWidget.addItems(self.hidden_list) # by default all hidden
+        # Shown items
+        if not self.loadDisplaySettings():
+            self.saveDisplaySettings() # initial saving
+
+        self.hiddenListWidget.addItems(self.hidden_list) 
+        self.shownListWidget.addItems(self.shown_list) # self.shown_list is used for displaying data
 
         # Buttons and Menu settings
         self.hiddenToShown.clicked.connect(self.showItems) # button to move item from hidden widget to shown widget  
@@ -82,8 +84,6 @@ class MainWindow(uiclass, baseclass):
         '''
         self.all_file_list = [file for file in os.listdir(self.file_dir) if 'log_' in file]
         self.file_list = self.all_file_list[-30:]   
-        self.fileSelect.addItem('') # empty item
-        self.fileSelect.addItems(self.all_file_list[::-1])
         return True
 
     def updateFiles(self):
@@ -96,7 +96,6 @@ class MainWindow(uiclass, baseclass):
             if 'log_' in file:
                 self.all_file_list.append(file)
                 self.file_list[1:].append(file)
-                self.fileSelect.insertItem(1, file)
                 return True
 
         else:
@@ -108,7 +107,7 @@ class MainWindow(uiclass, baseclass):
         Get data from logger files when monitor starts. It is not used for updating data reading
         '''
         self.all_data_by_name = {'Date': [], 'Time': [], 'Seconds': []}
-        window_length = int(self.windowLength.text()) 
+        window_length = self.windowLength.value()
         
         if not self.file_list: 
             self.debugLogger.error('Logged Data Not Found')
@@ -173,7 +172,9 @@ class MainWindow(uiclass, baseclass):
         Modification Suggestions: might add a condition: '# if self.window_length != window_length or self.line or [change_from_static_to_live]:'
         
         '''
-        window_length = int(self.windowLength.text())
+        window_length = self.windowLength.value()
+        if self.window_length != window_length:
+            self.saveDisplaySettings() # update the window length
         self.window_length = window_length
         self.data_by_name = {name: val[-1*window_length:] for name, val in self.all_data_by_name.items() if name not in ['Date', 'Time']}
         self.x = self.all_x[-1*window_length:]
@@ -452,7 +453,6 @@ class MainWindow(uiclass, baseclass):
         '''
         Plotting data 
         '''
-
         for name in self.all_names: 
             if name in self.shown_list: # plot line in shown widget
 
@@ -465,6 +465,53 @@ class MainWindow(uiclass, baseclass):
                 self.line_by_name[name].setData([], []) # display empty line
 
 ### ======================================================= List Widget Interaction =======================================================
+    def saveDisplaySettings(self):
+        '''
+        This will save hidden and shown items and window length in the file called 'display_settings.txt'
+        format:
+        1st line: 'hidden[, item1][, item2]....'
+        2nd line: 'shown[, item3][, item4]....'
+        3rd line: 'window length,[window_length]'
+        '''
+
+        hidden_list = ['hidden']
+        hidden_list.extend(self.hidden_list)
+        hidden_string = ','.join(hidden_list) + '\n'
+        shown_list = ['shown']
+        shown_list.extend(self.shown_list)
+        shown_string = ','.join(shown_list) + '\n'
+        window_length_string = 'window length,' + self.windowLength.text()
+        f = open(self.file_dir + 'display_settings.txt', 'w')
+        f.write(hidden_string + shown_string + window_length_string)
+        f.close()
+
+        return True
+    
+    def loadDisplaySettings(self):
+        '''
+        This will load hidden item and shown item settings
+        return True if loading successfully, else False
+        '''
+        if 'display_settings.txt' in os.listdir(self.file_dir):
+            self.hidden_list = []
+            self.shown_list = []
+            f = open(self.file_dir + 'display_settings.txt', 'r')
+            hidden_list = f.readline().strip('\n').split(',')[1:] # remove 'hidden' 
+            shown_list = f.readline().strip('\n').split(',')[1:] # remove 'shown'
+            window_length = f.readline().strip('\n').split(',')[1] # get window length in str
+            self.windowLength.setValue(int(window_length))
+            f.close()
+            for name in self.all_names:
+                if name in shown_list: 
+                    self.shown_list.append(name)
+                else: # in the case that the item is hidden or hasn't been set up
+                    self.hidden_list.append(name)
+            return True
+        else: # if the file not exist, copy all names to hidden list
+            self.hidden_list = self.all_names.copy() 
+            self.shown_list = []
+            return False        
+
     def hideItems(self):
         '''
         Move items from shown list to hidden list, and from shown widget to hidden widget
@@ -476,6 +523,7 @@ class MainWindow(uiclass, baseclass):
             self.shown_list.remove(item.text()) # add the item from hidden list
             self.hidden_list.append(item.text()) # remove the item to the shown list
         
+        self.saveDisplaySettings() # save current setting
         return True
 
     def showItems(self):
@@ -490,6 +538,7 @@ class MainWindow(uiclass, baseclass):
             self.hidden_list.remove(item.text()) # remove the item from hidden list
             self.shown_list.append(item.text()) # add the item to the shown list
 
+        self.saveDisplaySettings() # save current setting
         return True
 
 ### =======================================================Alias Related=======================================================
@@ -598,7 +647,6 @@ class MainWindow(uiclass, baseclass):
                 maximum = self.max_by_name[name]
                 static = self.static_by_name[name]
 
-                
                 if static:
                     if self.data_by_name[name][-1] != static:
                         warning_status = True
