@@ -95,7 +95,8 @@ class MainWindow(uiclass, baseclass):
             # check if file format is correct
             if 'log_' in file:
                 self.all_file_list.append(file)
-                self.file_list[1:].append(file)
+                self.file_list = self.file_list[1:]
+                self.file_list.append(file)
                 return True
 
         else:
@@ -145,7 +146,7 @@ class MainWindow(uiclass, baseclass):
 
         This is the data checking processing and used for live data
         '''
-        
+
         if self.current_file != self.file_list[-1]:
             self.f.close() # when new file exist, close the previous file
             self.current_file = self.file_list[-1]
