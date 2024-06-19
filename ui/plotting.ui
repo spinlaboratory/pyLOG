@@ -512,42 +512,43 @@
       <property name="title">
        <string>Status</string>
       </property>
-      <widget class="QRadioButton" name="radioButton">
+      <property name="flat">
+       <bool>false</bool>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
+      <widget class="QCheckBox" name="LED1">
        <property name="geometry">
         <rect>
          <x>10</x>
          <y>20</y>
-         <width>81</width>
-         <height>16</height>
+         <width>70</width>
+         <height>17</height>
         </rect>
        </property>
-       <property name="mouseTracking">
-        <bool>false</bool>
-       </property>
        <property name="styleSheet">
-        <string notr="true">QRadioButton::indicator {
+        <string notr="true">QCheckBox::indicator {
     width:                  10px;
     height:                 10px;
     border-radius:        7px;
 }
 
-QRadioButton::indicator:checked {
-    background-color:       green;
-    border:                 2px solid white;
-}
-
-QRadioButton::indicator:unchecked {
+QCheckBox::indicator:unchecked {
     background-color:       red;
     border:                 2px solid white;
 }</string>
        </property>
        <property name="text">
-        <string>RadioButton</string>
+        <string>Logger</string>
        </property>
        <property name="checkable">
-        <bool>true</bool>
+        <bool>false</bool>
        </property>
        <property name="checked">
+        <bool>false</bool>
+       </property>
+       <property name="tristate">
         <bool>false</bool>
        </property>
       </widget>

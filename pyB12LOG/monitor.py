@@ -23,6 +23,7 @@ from datetime import datetime
 import numpy as _np
 from PySide6.QtWidgets import QApplication, QFileDialog
 from PyQt6 import QtCore
+from PyQt6.QtWidgets import QVBoxLayout, QCheckBox
 import pyqtgraph as pg
 from .loggerConfig import *
 from .debugLog import *
@@ -30,12 +31,11 @@ from .debugLog import *
 dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 uiFile = dir_path + "/ui/plotting.ui"
 uiclass, baseclass = pg.Qt.loadUiType(uiFile)
-
-
 class MainWindow(uiclass, baseclass):
     def __init__(self, config_file: str = None):
         super().__init__()
         self.setupUi(self)
+        
         # configuration file
         config = loggerConfig(config_file)
         self.settings = config.settings
@@ -65,6 +65,10 @@ class MainWindow(uiclass, baseclass):
             self.shown_list
         )  # self.shown_list is used for displaying data
 
+        # Status Indicator
+        self.setLEDIndicator()
+        self.setStatus()
+
         # Buttons and Menu settings
         self.hiddenToShown.clicked.connect(
             self.showItems
@@ -80,6 +84,7 @@ class MainWindow(uiclass, baseclass):
         self.timer = QtCore.QTimer()
         self.timer.setInterval(300)
         self.timer.timeout.connect(self.printStatus)
+        self.timer.timeout.connect(self.setStatus)
         self.timer.timeout.connect(self.printWarning)
         self.timer.timeout.connect(self.updateFiles)
         self.timer.timeout.connect(self.updateData)
@@ -749,6 +754,41 @@ class MainWindow(uiclass, baseclass):
             self.textIndicator.clear()
             self.textIndicator.appendPlainText(self.status_string)
 
+    def setLEDIndicator(self):
+        """
+        Set indicators based on the number of devices and status of devices
+        """
+        layout = QVBoxLayout()
+        self.indicator_dictionary = {"Logger": self.LED1}
+        self.status = {False: self.LED1.styleSheet(), True: self.LED1.styleSheet().replace("red", "green")}
+        for device in self.device_config:
+            led = QCheckBox(device)
+            led.setCheckable(False)
+            led.setStyleSheet(self.status[False])
+            layout.addWidget(led)
+            self.indicator_dictionary[device] = led
+        self.groupBox_6.setLayout(layout)
+
+    def setStatus(self):
+        """
+        Set indicator values of devices
+        """
+        current_exe = (
+            os.popen("wmic process get description")
+            .read()
+            .strip()
+            .replace(" ", "")
+            .split("\n\n")
+        )
+        logger_status_change = "pyB12logger_running.exe" in current_exe != self.LED1.styleSheet() == self.status[True]
+        if logger_status_change:
+            self.indicator_dictionary["Logger"].setStyleSheet(self.status["pyB12logger_running.exe" in current_exe])
+
+        for device in self.device_config:
+            change_detected = self.device_config[device]["device_status"] != self.indicator_dictionary[device].styleSheet() == self.status[True]
+            if change_detected:
+                self.indicator_dictionary[device].setStyleSheet(self.status[self.device_config[device]["device_status"]])
+            
     ### ======================================================= Warning Related =======================================================
     def getWarningValueByName(self):
         """
