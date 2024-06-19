@@ -99,7 +99,7 @@ class MainWindow(uiclass, baseclass):
         self.all_file_list = [
             file for file in os.listdir(self.file_dir) if "log_" in file
         ]
-        self.file_list = self.all_file_list[-30:]
+        self.file_list = self.all_file_list[-500:]
         return True
 
     def updateFiles(self):
@@ -288,8 +288,8 @@ class MainWindow(uiclass, baseclass):
             elif name:
                 val = _np.nan
 
-            if len(d[name]) > 100000:
-                del d[name][0]
+            # if len(d[name]) > 10000000:
+            #     del d[name][0]
 
             d[name].append(val)
         del td  # release memory
@@ -730,22 +730,22 @@ class MainWindow(uiclass, baseclass):
             .split("\n\n")
         )
         if "pyB12logger_running.exe" in current_exe:
-            string = "Logger Enable\n"
+            string = "Logger Enabled\n"
         else:
-            string = "Logger Disable\n"
+            string = "Logger Disabled\n"
 
         for device in self.device_config:
             if self.device_config[device]["device_status"] == False:
                 string += device + " Disable\n"
             else:
-                temp = device + " Enable\n"
+                temp = device + " Enabled\n"
                 for name in self.commands[device]:
                     name = self.getAlias(name)
                     if (
                         self.all_data_by_name[name][-1] in [_np.nan]
                         or "pyB12logger_running.exe" not in current_exe
                     ):  # check the last data point, please refer to np.nan equality
-                        temp = device + " Disable\n"
+                        temp = device + " Disabled\n"
                         break
                 string += temp
 
@@ -780,12 +780,12 @@ class MainWindow(uiclass, baseclass):
             .replace(" ", "")
             .split("\n\n")
         )
-        logger_status_change = "pyB12logger_running.exe" in current_exe != self.LED1.styleSheet() == self.status[True]
+        logger_status_change = ("pyB12logger_running.exe" in current_exe) != (self.LED1.styleSheet() == self.status[True])
         if logger_status_change:
             self.indicator_dictionary["Logger"].setStyleSheet(self.status["pyB12logger_running.exe" in current_exe])
 
         for device in self.device_config:
-            change_detected = self.device_config[device]["device_status"] != self.indicator_dictionary[device].styleSheet() == self.status[True]
+            change_detected = self.device_config[device]["device_status"] != (self.indicator_dictionary[device].styleSheet() == self.status[True])
             if change_detected:
                 self.indicator_dictionary[device].setStyleSheet(self.status[self.device_config[device]["device_status"]])
             
