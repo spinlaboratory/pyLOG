@@ -83,7 +83,6 @@ class MainWindow(uiclass, baseclass):
 
         self.timer = QtCore.QTimer()
         self.timer.setInterval(300)
-        self.timer.timeout.connect(self.printStatus)
         self.timer.timeout.connect(self.setStatus)
         self.timer.timeout.connect(self.printWarning)
         self.timer.timeout.connect(self.updateFiles)
@@ -717,43 +716,6 @@ class MainWindow(uiclass, baseclass):
         return names
 
     ### =======================================================Status Related=======================================================
-    def printStatus(self):
-        """
-        Print the status of logger and devices
-        """
-
-        current_exe = (
-            os.popen("wmic process get description")
-            .read()
-            .strip()
-            .replace(" ", "")
-            .split("\n\n")
-        )
-        if "pyB12logger_running.exe" in current_exe:
-            string = "Logger Enabled\n"
-        else:
-            string = "Logger Disabled\n"
-
-        for device in self.device_config:
-            if self.device_config[device]["device_status"] == False:
-                string += device + " Disable\n"
-            else:
-                temp = device + " Enabled\n"
-                for name in self.commands[device]:
-                    name = self.getAlias(name)
-                    if (
-                        self.all_data_by_name[name][-1] in [_np.nan]
-                        or "pyB12logger_running.exe" not in current_exe
-                    ):  # check the last data point, please refer to np.nan equality
-                        temp = device + " Disabled\n"
-                        break
-                string += temp
-
-        if self.status_string != string:
-            self.status_string = string
-            self.textIndicator.clear()
-            self.textIndicator.appendPlainText(self.status_string)
-
     def setLEDIndicator(self):
         """
         Set indicators based on the number of devices and status of devices
@@ -785,9 +747,12 @@ class MainWindow(uiclass, baseclass):
             self.indicator_dictionary["Logger"].setStyleSheet(self.status["pyB12logger_running.exe" in current_exe])
 
         for device in self.device_config:
-            change_detected = self.device_config[device]["device_status"] != (self.indicator_dictionary[device].styleSheet() == self.status[True])
-            if change_detected:
-                self.indicator_dictionary[device].setStyleSheet(self.status[self.device_config[device]["device_status"]])
+            if "pyB12logger_running.exe" in current_exe:
+                change_detected = self.device_config[device]["device_status"] != (self.indicator_dictionary[device].styleSheet() == self.status[True])
+                if change_detected:
+                    self.indicator_dictionary[device].setStyleSheet(self.status[self.device_config[device]["device_status"]])
+            else:
+                self.indicator_dictionary[device].setStyleSheet(self.status[False])
             
     ### ======================================================= Warning Related =======================================================
     def getWarningValueByName(self):
