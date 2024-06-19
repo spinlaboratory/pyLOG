@@ -516,7 +516,7 @@
        <bool>false</bool>
       </property>
       <property name="checkable">
-       <bool>true</bool>
+       <bool>false</bool>
       </property>
       <widget class="QCheckBox" name="LED1">
        <property name="geometry">
