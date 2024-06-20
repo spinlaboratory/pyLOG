@@ -766,7 +766,7 @@ class MainWindow(uiclass, baseclass):
             .replace(" ", "")
             .split("\n\n")
         )
-        logger_status_change = ("pyB12logger_running.exe" in current_exe) != (self.LED1.styleSheet() == self.status[True])
+        logger_status_change = ("pyB12logger_running.exe" in current_exe) != (self.indicator_dictionary["Logger"].styleSheet() == self.status[True])
         if logger_status_change:
             self.indicator_dictionary["Logger"].setStyleSheet(self.status["pyB12logger_running.exe" in current_exe])
 
@@ -786,6 +786,11 @@ class MainWindow(uiclass, baseclass):
                             self.indicator_dictionary[indicator].setStyleSheet(self.status[res])
             else:
                 self.indicator_dictionary[device].setStyleSheet(self.status[False])
+                for name in self.status_names[device]:
+                    indicators = self.commands[device][name]['indicators']
+                    for indicator in indicators:
+                        self.indicator_dictionary[indicator].setStyleSheet(self.status[False])
+
             
     ### ======================================================= Warning Related =======================================================
     def getCommandInfoByName(self):
