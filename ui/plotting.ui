@@ -38,40 +38,6 @@
       <property name="checkable">
        <bool>false</bool>
       </property>
-      <widget class="QCheckBox" name="LED1">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>20</y>
-         <width>70</width>
-         <height>17</height>
-        </rect>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">QCheckBox::indicator {
-    width:                  10px;
-    height:                 10px;
-    border-radius:        7px;
-}
-
-QCheckBox::indicator:unchecked {
-    background-color:       red;
-    border:                 2px solid white;
-}</string>
-       </property>
-       <property name="text">
-        <string>Logger</string>
-       </property>
-       <property name="checkable">
-        <bool>false</bool>
-       </property>
-       <property name="checked">
-        <bool>false</bool>
-       </property>
-       <property name="tristate">
-        <bool>false</bool>
-       </property>
-      </widget>
      </widget>
     </item>
     <item row="3" column="0">

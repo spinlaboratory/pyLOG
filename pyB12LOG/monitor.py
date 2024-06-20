@@ -735,7 +735,6 @@ class MainWindow(uiclass, baseclass):
         self.status_names = {} # the list to store what need to be shown as status
         layout = QVBoxLayout()
         self.indicator_dictionary = {}
-        # self.status = {False: self.LED1.styleSheet(), True: self.LED1.styleSheet().replace("red", "green")}
         self.status = {False: red, True: green}
         for device in ["Logger"] + list(self.device_config):
             led = QCheckBox(device)
