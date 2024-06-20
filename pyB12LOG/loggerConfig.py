@@ -40,6 +40,10 @@ command_default = {
     "min": None,
     "max": None,
     "static": None,
+    "bits": None,
+    "bit_static": None,
+    "indicators": None,
+    "indicators_reverse": None
 }
 
 
@@ -135,7 +139,7 @@ class loggerConfig:
 
         """
         command_info = command_default.copy()
-        command_list = command_string.split(",")
+        command_list = command_string.split(", ")
         for index, item in enumerate(command_list):
             item = item.strip()  # remove leading and tailing white space
             if index == 0:
@@ -145,10 +149,21 @@ class loggerConfig:
                 key, value = item.split("=")  # get key and value from item
                 key = key.strip()  # remove leading and tailing white space
                 value = value.strip()  # remove leading and tailing white space
+
                 if key == "alias":
                     command_info["alias"] = value
+
+                elif key == 'bit_static':
+                    command_info['bit_static'] = str(value)
                 else:
                     command_info[key] = eval(value)
+        
+        if command_info['indicators']:
+            command_info['indicators_reverse'] = [False] * len(command_info['indicators'])
+            for i in range(len(command_info['indicators'])):
+                if '*' in command_info['indicators'][i]:
+                    command_info['indicators_reverse'][i] = True
+                    command_info['indicators'][i] = command_info['indicators'][i].replace('*', '')
 
         return command_info
 

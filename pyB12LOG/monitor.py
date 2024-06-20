@@ -31,6 +31,8 @@ from .debugLog import *
 dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 uiFile = dir_path + "/ui/plotting.ui"
 uiclass, baseclass = pg.Qt.loadUiType(uiFile)
+red = "QCheckBox::indicator {\nwidth:10px;\nheight:10px;\nborder-radius:7px;\n}\n\nQCheckBox::indicator:unchecked {\nbackground-color:red;\nborder:2px solid white;\n}\n"
+green = "QCheckBox::indicator {\nwidth:10px;\nheight:10px;\nborder-radius:7px;\n}\n\nQCheckBox::indicator:unchecked {\nbackground-color:green;\nborder:2px solid white;\n}\n"
 class MainWindow(uiclass, baseclass):
     def __init__(self, config_file: str = None):
         super().__init__()
@@ -43,7 +45,7 @@ class MainWindow(uiclass, baseclass):
         self.file_dir = self.settings["log_folder_location"] + "/B12TLOG/"
         self.commands = config.commands
         self.getAlias()
-        self.getWarningValueByName()
+        self.getCommandInfoByName()
         self.status_string = ""
 
         # debug log
@@ -98,7 +100,7 @@ class MainWindow(uiclass, baseclass):
         self.all_file_list = [
             file for file in os.listdir(self.file_dir) if "log_" in file
         ]
-        self.file_list = self.all_file_list[-500:]
+        self.file_list = self.all_file_list[-30:]
         return True
 
     def updateFiles(self):
@@ -183,9 +185,10 @@ class MainWindow(uiclass, baseclass):
             self.names = self.convertNames(self.names)  # convert names list from alias
 
         self.line = self.f.readline().strip("\n")
+        self.latest_data = None
         if self.line:
             self.all_data_by_name = self.addDataToDict(
-                self.names, self.line.strip("\n").split(","), self.all_data_by_name
+                self.names, self.line.strip("\n").split(",") , self.all_data_by_name
             )
             # self.all_x doesn't need to be updated because it is the reference to self.all_data_by_name['Seconds']
 
@@ -269,6 +272,7 @@ class MainWindow(uiclass, baseclass):
         # convert name from alias:
         # temporary dictionary
         td = {name.strip(): val.strip() for name, val in zip(names, data)}
+        
         # create empty list if key not exists in dictionary
         for name in td.keys():
             if name not in d.keys():
@@ -276,21 +280,19 @@ class MainWindow(uiclass, baseclass):
 
         for name in d.keys():
             if name in ["Date", "Time"]:
-                val = td[name].strip()
+                td[name] = td[name].strip()
             elif name == "Seconds":
-                val = self.getXAxisFromTime(td["Date"].strip(), td["Time"].strip())
+                td[name] = self.getXAxisFromTime(td["Date"].strip(), td["Time"].strip())
             elif name in td and td[name] != "nan":
-                try:
-                    val = float(td[name])
-                except:
-                    val = int(td[name], base=16)  # convert 16-bit hex value
+                if self.command_info_by_name[name][3]:
+                    td[name] = str(td[name])
+                else:
+                    td[name] = float(td[name])
             elif name:
-                val = _np.nan
-
-            # if len(d[name]) > 10000000:
-            #     del d[name][0]
-
-            d[name].append(val)
+                td[name] = _np.nan
+            
+            d[name].append(td[name])
+        self.latest_data = td
         del td  # release memory
         return d
 
@@ -600,9 +602,12 @@ class MainWindow(uiclass, baseclass):
         shown_list = ["shown"]
         shown_list.extend(self.shown_list)
         shown_string = ",".join(shown_list) + "\n"
+        ingnore_list = ["ignore"]
+        ingnore_list.extend(self.ignore_list)
+        ignore_string = ",".join(ingnore_list) + "\n"
         window_length_string = "window length," + self.windowLength.text()
         f = open(self.file_dir + "display_settings.txt", "w")
-        f.write(hidden_string + shown_string + window_length_string)
+        f.write(hidden_string + shown_string + ignore_string + window_length_string)
         f.close()
 
         return True
@@ -612,12 +617,15 @@ class MainWindow(uiclass, baseclass):
         This will load hidden item and shown item settings
         return True if loading successfully, else False
         """
+
+        self.hidden_list = []
+        self.shown_list = []
+        self.ignore_list =[]
         if "display_settings.txt" in os.listdir(self.file_dir):
-            self.hidden_list = []
-            self.shown_list = []
             f = open(self.file_dir + "display_settings.txt", "r")
             hidden_list = f.readline().strip("\n").split(",")[1:]  # remove 'hidden'
             shown_list = f.readline().strip("\n").split(",")[1:]  # remove 'shown'
+            ignore_list = f.readline().strip("\n").split(",")[1:]  # remove 'ignore'
             window_length = (
                 f.readline().strip("\n").split(",")[1]
             )  # get window length in str
@@ -626,12 +634,16 @@ class MainWindow(uiclass, baseclass):
             for name in self.all_names:
                 if name in shown_list:
                     self.shown_list.append(name)
-                else:  # in the case that the item is hidden or hasn't been set up
+                elif name in hidden_list:  # in the case that the item is hidden or hasn't been set up
                     self.hidden_list.append(name)
+                elif name in ignore_list:
+                    self.ignore_list.append(name)
             return True
         else:  # if the file not exist, copy all names to hidden list
             self.hidden_list = self.all_names.copy()
-            self.shown_list = []
+            for name in self.all_names:
+                if self.command_info_by_name[name][3]:
+                    self.ignore_list.append(self.hidden_list.pop(self.hidden_list.index(name)))
             return False
 
     def hideItems(self):
@@ -720,15 +732,28 @@ class MainWindow(uiclass, baseclass):
         """
         Set indicators based on the number of devices and status of devices
         """
+        self.status_names = {} # the list to store what need to be shown as status
         layout = QVBoxLayout()
-        self.indicator_dictionary = {"Logger": self.LED1}
-        self.status = {False: self.LED1.styleSheet(), True: self.LED1.styleSheet().replace("red", "green")}
-        for device in self.device_config:
+        self.indicator_dictionary = {}
+        # self.status = {False: self.LED1.styleSheet(), True: self.LED1.styleSheet().replace("red", "green")}
+        self.status = {False: red, True: green}
+        for device in ["Logger"] + list(self.device_config):
             led = QCheckBox(device)
             led.setCheckable(False)
             led.setStyleSheet(self.status[False])
             layout.addWidget(led)
             self.indicator_dictionary[device] = led
+            self.status_names[device] = []
+            if device != "Logger":
+                for name, info in self.commands[device].items():
+                    if info['indicators']:
+                        self.status_names[device].append(name)
+                        for indicator in info['indicators']:
+                            led = QCheckBox(indicator)
+                            led.setCheckable(False)
+                            led.setStyleSheet(self.status[False])
+                            layout.addWidget(led)
+                            self.indicator_dictionary[indicator] = led
         self.groupBox_6.setLayout(layout)
 
     def setStatus(self):
@@ -751,24 +776,36 @@ class MainWindow(uiclass, baseclass):
                 change_detected = self.device_config[device]["device_status"] != (self.indicator_dictionary[device].styleSheet() == self.status[True])
                 if change_detected:
                     self.indicator_dictionary[device].setStyleSheet(self.status[self.device_config[device]["device_status"]])
+            
+                if self.latest_data:
+                    for name in self.status_names[device]:
+                        indicators = self.commands[device][name]['indicators']
+                        indicators_reverse = self.commands[device][name]['indicators_reverse']
+                        status = self.convertStringtoBit(self.latest_data[self.getAlias('status')], len(indicators), True)
+                        for i, indicator in enumerate(indicators):
+                            res = bool(eval(status[i])) if not indicators_reverse[i] else bool(1 - eval(status[i]))
+                            self.indicator_dictionary[indicator].setStyleSheet(self.status[res])
             else:
                 self.indicator_dictionary[device].setStyleSheet(self.status[False])
             
     ### ======================================================= Warning Related =======================================================
-    def getWarningValueByName(self):
+    def getCommandInfoByName(self):
         """
-        Get warning values
+        Get commands returns information: [min, max, static, bit_static]
         """
-        self.min_by_name = {}
-        self.max_by_name = {}
-        self.static_by_name = {}
+
+        self.command_info_by_name = {}
         for device in self.device_config:
             for name, info in self.commands[device].items():
                 name = self.getAlias(name)  # convert to alias
-                self.min_by_name[name] = info["min"]
-                self.max_by_name[name] = info["max"]
-                self.static_by_name[name] = info["static"]
+                self.command_info_by_name[name] = [None, None, None, None]
+                self.command_info_by_name[name][0] = info["min"]
+                self.command_info_by_name[name][1] = info["max"]
+                self.command_info_by_name[name][2] = info["static"]
+                if info['bit_static']:
+                    self.command_info_by_name[name][3] = self.convertStringtoBit(info['bit_static'], info['bits'], True)
 
+    ### ======================================================= Warning Related =======================================================
     def setWarningStatusByName(self):
         """
         Set warning status to True if the warning has been displayed
@@ -783,10 +820,9 @@ class MainWindow(uiclass, baseclass):
         for name in self.all_data_by_name:
             if name not in ["Date", "Time", "Seconds"]:
                 warning_status = False
-                minimum = self.min_by_name[name]
-                maximum = self.max_by_name[name]
-                static = self.static_by_name[name]
-
+                minimum = self.command_info_by_name[name][0]
+                maximum = self.command_info_by_name[name][1]
+                static = self.command_info_by_name[name][2]
                 if static:
                     if self.all_data_by_name[name][-1] != static:
                         warning_status = True
@@ -884,6 +920,31 @@ class MainWindow(uiclass, baseclass):
             return index2
         else:
             return index1
+    
+    def convertStringtoBit(self, string, bits = None, reverse = False):
+        '''
+        convert string to bit string, and optionally to trim it and reverse it
+        eg. if string is 301, the function will return 1100000001,
+            if bits is 9 and reverse is False, the function will return 100000001,
+            if reverse is True and bits is None, the function will return 1000000011,
+
+            Trimming will be applied before Reverse.
+            
+        '''
+
+        if '0x' not in string:
+            string = '0x' + string
+        
+        out = bin(eval(string))
+        out = out.replace('0b', '')
+        if bits:
+            out = out[-1 * bits:]
+            if len(out) < bits:
+                out = '0' * (bits - len(out)) + out
+        if reverse:
+            out = out[::-1]
+        
+        return out
 
 
 if __name__ == "__main__":
