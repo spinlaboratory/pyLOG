@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1097</width>
-    <height>981</height>
+    <width>1330</width>
+    <height>1009</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -480,6 +480,44 @@
       </property>
      </widget>
     </item>
+    <item row="0" column="2">
+     <widget class="QGroupBox" name="groupBox_3">
+      <property name="title">
+       <string/>
+      </property>
+      <widget class="QCheckBox" name="systemStatus">
+       <property name="geometry">
+        <rect>
+         <x>40</x>
+         <y>30</y>
+         <width>241</width>
+         <height>61</height>
+        </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>20</pointsize>
+        </font>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QCheckBox::indicator {
+	width:40px;
+	height:40px;
+	border-radius:22px;}
+
+QCheckBox::indicator:unchecked {
+	background-color:red;
+	border:2px solid white;}</string>
+       </property>
+       <property name="text">
+        <string>System Status</string>
+       </property>
+       <property name="checkable">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </widget>
+    </item>
    </layout>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -488,7 +526,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1097</width>
+     <width>1330</width>
      <height>21</height>
     </rect>
    </property>

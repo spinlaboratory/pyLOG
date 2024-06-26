@@ -32,7 +32,7 @@ dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 uiFile = dir_path + "/ui/plotting.ui"
 uiclass, baseclass = pg.Qt.loadUiType(uiFile)
 red = "QCheckBox::indicator {\nwidth:10px;\nheight:10px;\nborder-radius:7px;\n}\n\nQCheckBox::indicator:unchecked {\nbackground-color:red;\nborder:2px solid white;\n}\n"
-green = "QCheckBox::indicator {\nwidth:10px;\nheight:10px;\nborder-radius:7px;\n}\n\nQCheckBox::indicator:unchecked {\nbackground-color:green;\nborder:2px solid white;\n}\n"
+green = "QCheckBox::indiator {\nwidth:10px;\nheight:10px;\nborder-radius:7px;\n}\n\nQCheckBox::indicator:unchecked {\nbackground-color:green;\nborder:2pcx solid white;\n}\n"
 class MainWindow(uiclass, baseclass):
     def __init__(self, config_file: str = None):
         super().__init__()
@@ -791,7 +791,24 @@ class MainWindow(uiclass, baseclass):
                     for indicator in indicators:
                         self.indicator_dictionary[indicator].setStyleSheet(self.status[False])
 
-            
+        self.setSystemStatus()
+        
+    def setSystemStatus(self):
+        """
+        Set System Status based on indicator values
+        """
+        for indicator in self.indicator_dictionary.values():
+            if 'red' in indicator.styleSheet():
+                status = self.systemStatus.styleSheet().replace('green', 'red')
+                self.systemStatus.setStyleSheet(status) 
+
+                return False
+        
+        status = self.systemStatus.styleSheet().replace('red', 'green')
+        self.systemStatus.setStyleSheet(status)
+
+        return True
+        
     ### ======================================================= Warning Related =======================================================
     def getCommandInfoByName(self):
         """
