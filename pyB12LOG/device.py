@@ -26,6 +26,7 @@ class DEVICE:
     def _getResourceManager(self):
         self.rm = pyvisa.ResourceManager()
         self.deviceAddresses = self.rm.list_resources()
+        print(self.deviceAddresses)
 
         return True
 

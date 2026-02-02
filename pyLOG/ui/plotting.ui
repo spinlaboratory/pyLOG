@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>pyB12Monitor</string>
+   <string>pyMonitor</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_2">
@@ -445,7 +445,7 @@
        </font>
       </property>
       <property name="text">
-       <string>PyB12Monitor</string>
+       <string>PyMonitor</string>
       </property>
       <property name="textFormat">
        <enum>Qt::PlainText</enum>

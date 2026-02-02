@@ -32,7 +32,7 @@ dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 uiFile = dir_path + "/ui/plotting.ui"
 uiclass, baseclass = pg.Qt.loadUiType(uiFile)
 red = "QCheckBox::indicator {\nwidth:10px;\nheight:10px;\nborder-radius:7px;\n}\n\nQCheckBox::indicator:unchecked {\nbackground-color:red;\nborder:2px solid white;\n}\n"
-green = "QCheckBox::indicator {\nwidth:10px;\nheight:10px;\nborder-radius:7px;\n}\n\nQCheckBox::indicator:unchecked {\nbackground-color:green;\nborder:2px solid white;\n}\n"
+green = "QCheckBox::indiator {\nwidth:10px;\nheight:10px;\nborder-radius:7px;\n}\n\nQCheckBox::indicator:unchecked {\nbackground-color:green;\nborder:2pcx solid white;\n}\n"
 class MainWindow(uiclass, baseclass):
     def __init__(self, config_file: str = None):
         super().__init__()
@@ -54,7 +54,7 @@ class MainWindow(uiclass, baseclass):
         # get files from directionary
         self.getFiles()
         self.getData()
-        self.setWarningStatusByName()
+        self.setWarningLevelByName()
         self.getPenByName()
         self.getLine()  # initialize plot
 
@@ -100,7 +100,7 @@ class MainWindow(uiclass, baseclass):
         self.all_file_list = [
             file for file in os.listdir(self.file_dir) if "log_" in file
         ]
-        self.file_list = self.all_file_list[-30:]
+        self.file_list = self.all_file_list[-300:]
         return True
 
     def updateFiles(self):
@@ -754,7 +754,7 @@ class MainWindow(uiclass, baseclass):
                             layout.addWidget(led)
                             self.indicator_dictionary[indicator] = led
         self.groupBox_6.setLayout(layout)
-
+        
     def setStatus(self):
         """
         Set indicator values of devices
@@ -781,17 +781,49 @@ class MainWindow(uiclass, baseclass):
                         indicators = self.commands[device][name]['indicators']
                         indicators_reverse = self.commands[device][name]['indicators_reverse']
                         status = self.convertStringtoBit(self.latest_data[self.getAlias('status')], len(indicators), True)
-                        for i, indicator in enumerate(indicators):
-                            res = bool(eval(status[i])) if not indicators_reverse[i] else bool(1 - eval(status[i]))
-                            self.indicator_dictionary[indicator].setStyleSheet(self.status[res])
+                        if status == -1:
+                            for i, indicator in enumerate(indicators):
+                               self.indicator_dictionary[indicator].setStyleSheet(self.status[False])
+                        else:
+                            for i, indicator in enumerate(indicators):
+                                res = bool(eval(status[i])) if not indicators_reverse[i] else bool(1 - eval(status[i]))
+                                self.indicator_dictionary[indicator].setStyleSheet(self.status[res])
             else:
                 self.indicator_dictionary[device].setStyleSheet(self.status[False])
                 for name in self.status_names[device]:
                     indicators = self.commands[device][name]['indicators']
                     for indicator in indicators:
                         self.indicator_dictionary[indicator].setStyleSheet(self.status[False])
+                        
+        self.setSystemStatus()
+        
+    def setSystemStatus(self):
+        """
+        Set System Status based on indicator values
+        """
+        for indicator in self.indicator_dictionary.values():
+            if 'red' in indicator.styleSheet():
+                temp_status = self.systemStatus.styleSheet().replace('green', 'red')
+                self.systemStatus.setStyleSheet(temp_status) 
+                
+                return False
+        
+        for level in self.warning_level_by_name.values():
+            if level == 2:
+                temp_status = self.systemStatus.styleSheet().replace('green', 'red')
+                self.systemStatus.setStyleSheet(temp_status) 
+                return False
+            elif level == 1:
+                if 'green' in indicator.styleSheet():
+                    temp_status = self.systemStatus.styleSheet().replace('green', 'orange')
+                    self.systemStatus.setStyleSheet(temp_status)
+                    return False
 
-            
+        temp_status = self.systemStatus.styleSheet().replace('red', 'green')
+        self.systemStatus.setStyleSheet(temp_status)
+
+        return True
+        
     ### ======================================================= Warning Related =======================================================
     def getCommandInfoByName(self):
         """
@@ -810,12 +842,12 @@ class MainWindow(uiclass, baseclass):
                     self.command_info_by_name[name][3] = self.convertStringtoBit(info['bit_static'], info['bits'], True)
 
     ### ======================================================= Warning Related =======================================================
-    def setWarningStatusByName(self):
+    def setWarningLevelByName(self):
         """
-        Set warning status to True if the warning has been displayed
+        Set warning level for system indicator
         """
 
-        self.warning_status_by_name = {name: False for name in self.data_by_name}
+        self.warning_level_by_name = {name: 0 for name in self.data_by_name}
 
     def printWarning(self):
         """
@@ -823,44 +855,52 @@ class MainWindow(uiclass, baseclass):
         """
         for name in self.all_data_by_name:
             if name not in ["Date", "Time", "Seconds"]:
-                warning_status = False
+                warning_level = 0
                 minimum = self.command_info_by_name[name][0]
                 maximum = self.command_info_by_name[name][1]
                 static = self.command_info_by_name[name][2]
                 if static:
                     if self.all_data_by_name[name][-1] != static:
-                        warning_status = True
+                        warning_level = 2
 
                 if minimum:
                     if self.all_data_by_name[name][-1] < minimum:
-                        warning_status = True
+                        warning_level = 2
+
+                    elif self.all_data_by_name[name][-1] < 1.05 * minimum:
+                        warning_level = 1
 
                 if maximum:
                     if self.all_data_by_name[name][-1] > maximum:
-                        warning_status = True
-
+                        warning_level = 2
+                    elif self.all_data_by_name[name][-1] > 0.95 * maximum:
+                        warning_level = 1
+                
                 if (
-                    warning_status and not self.warning_status_by_name[name]
+                    warning_level > 0 and self.warning_level_by_name[name] == 0
                 ):  # warning begins
                     current_time = (
                         self.all_data_by_name["Date"][-1]
                         + " "
                         + self.all_data_by_name["Time"][-1]
                     )
-                    self.warning_status_by_name[name] = True
-                    string = current_time + ": " + name + " error."
+                    self.warning_level_by_name[name] = warning_level
+                    if warning_level == 1:
+                        string = current_time + ": " + name + " is reaching limit"
+                    elif warning_level == 2:
+                        string = current_time + ": " + name + " exceeds limit"
                     self.warningText.appendPlainText(string)
 
                 elif (
-                    not warning_status and self.warning_status_by_name[name]
+                    warning_level == 0 and self.warning_level_by_name[name] > 0
                 ):  # warning ends
                     current_time = (
                         self.all_data_by_name["Date"][-1]
                         + " "
                         + self.all_data_by_name["Time"][-1]
                     )
-                    self.warning_status_by_name[name] = False
-                    string = current_time + ": " + name + " error clean."
+                    self.warning_level_by_name[name] = warning_level
+                    string = current_time + ": " + name + " warning/error clean."
                     self.warningText.appendPlainText(string)
 
     def clearWarning(self):
@@ -869,7 +909,7 @@ class MainWindow(uiclass, baseclass):
         """
         for name in self.data_by_name:
             if name not in ["Date", "Time", "Seconds"]:
-                self.warning_status_by_name[name] = False
+                self.warning_level_by_name[name] = 0
         self.warningText.clear()
 
         return True
@@ -935,10 +975,12 @@ class MainWindow(uiclass, baseclass):
             Trimming will be applied before Reverse.
             
         '''
+        if isinstance(string, float): # nan
+            return -1
 
         if '0x' not in string:
             string = '0x' + string
-        
+
         out = bin(eval(string))
         out = out.replace('0b', '')
         if bits:
@@ -949,6 +991,7 @@ class MainWindow(uiclass, baseclass):
             out = out[::-1]
         
         return out
+
 
 
 if __name__ == "__main__":

@@ -36,10 +36,11 @@ class pyB12LOG:
         self.data_by_variable = self._getDataDictByVariable(
             self.commands
         )  # initial empty dictionary for storing data
-
+        
         self.header = self._makeLogHeader()
         self.last_query_time = None
         self.current_log_file = None
+        self.warning = 0
 
     def log(self):
         """
@@ -47,14 +48,15 @@ class pyB12LOG:
 
         It runs one time only.
         """
-        if not self.current_log_file:
-            self.debugLogger.info("new log file created")
-            self._createNewLog()
+        # if not self.current_log_file:
+        #     self.debugLogger.info("new log file created")
+        #     self._createNewLog()
 
         now = time.time()
         if self.reconnectDevices():  # check the device connections
             self.debugLogger.info("A device is reconnected")
         if not self.last_query_time or now - self.last_query_time > self.delay:
+            warning_level = 0
             self._setTimeInDataDictByVariable()  # update time
             devices_info = (
                 self.devices.devices_info
@@ -64,6 +66,7 @@ class pyB12LOG:
                 index = self.device_config[name]["index"]
                 device = devices_info[name]["device"]
                 for variable in info.keys():
+                    info[variable]['min'], info[variable]['max'], info[variable]['static']
                     if self.devices.checkDeviceStatus(
                         name
                     ):  # check the connection of a device
@@ -72,17 +75,38 @@ class pyB12LOG:
                         data = self._returnStringConverter(
                             data_string, delimiter, index
                         )
-
+                   
                     else:
                         data = "nan"  # write nan to not available data
-
                     self.data_by_variable[variable] = data
+
+                    # check warning
+                    if data == "nan":
+                        warning_level = 2
+
+                    elif info[variable]['static'] and float(data) != info[variable]['static']:
+                        warning_level = 2
+                    
+                    else:
+                        if info[variable]['min']:
+                            if float(data) <= info[variable]['min'] * 1.05:
+                                warning_level = max(warning_level, 1)
+                            elif float(data) < info[variable]['min']:
+                                warning_level = 2
+                                
+
+                        if info[variable]['max']:
+                            if float(data) >= info[variable]['max'] * 0.95:
+                                warning_level = max(warning_level, 1)
+                            elif float(data) > info[variable]['max']:
+                                warning_level = 2
+                    self.warning = warning_level
 
             self.last_query_time = now
 
-            if self._checkFileSize():  # exceed the maximum file size
-                if self._createNewLog():  # create log with header
-                    self.debugLogger.info("File size exceed, new log file created")
+            # if self._checkFileSize():  # exceed the maximum file size
+            #     if self._createNewLog():  # create log with header
+            #         self.debugLogger.info("File size exceed, new log file created")
 
             self._saveData()
 
@@ -127,12 +151,22 @@ class pyB12LOG:
             return False
         return True
 
+    def _findLog(self):
+        """
+        Find current log file
+        
+        """
+        today = datetime.datetime.now().strftime("%Y%m%d")  # YYYYMMDD
+        self.current_log_file = self.log_dir + "/log_" + today + ".csv"
+        
+        return "log_" + today + ".csv" in os.listdir(self.log_dir)
+
     def _createNewLog(self):
         """
         Create new log file in log directory
         """
-        now = datetime.datetime.now().strftime("%Y%m%d%H%M%S")  # YYYYMMDDHMS
-        self.current_log_file = self.log_dir + "/log_" + now + ".csv"
+        # now = datetime.datetime.now().strftime("%Y%m%d%H%M%S")  # YYYYMMDDHMS
+
         with open(self.current_log_file, "w") as f:
             f.write(self.header)
 
@@ -155,26 +189,27 @@ class pyB12LOG:
         Save current data to current log file
 
         """
-
         list_of_data = list(self.data_by_variable.values())
         data_string = ", ".join(list_of_data) + "\n"
 
+        if not self._findLog():
+            self._createNewLog()
         with open(self.current_log_file, "a") as f:
             f.write(data_string)
 
         return True
 
-    def _checkFileSize(self):
-        """
-        Check the size of file
+    # def _checkFileSize(self):
+    #     """
+    #     Check the size of file
 
-        Return:
-            bool: True if file is oversize
-        """
-        if os.path.getsize(self.current_log_file) > self.max_size * 1024:
-            return True
-        else:
-            return False
+    #     Return:
+    #         bool: True if file is oversize
+    #     """
+    #     if os.path.getsize(self.current_log_file) > self.max_size * 1024:
+    #         return True
+    #     else:
+    #         return False
 
     def _getDataDictByVariable(self, command_dict: dict):
         """
@@ -221,7 +256,6 @@ class pyB12LOG:
         self.data_by_variable["Date"] = today
         self.data_by_variable["Time"] = now
         return True
-
 
 # if __name__ == '__main__':
 #     pyB12LOG()
